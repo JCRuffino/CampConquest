@@ -1,5 +1,6 @@
 import { mutateState, pushLog } from './firebase.js';
-import { gameState, getMyTeam, setMyTeam, states } from './shared.js';
+import { gameState, getMyTeam, setMyTeam, states,
+         getGameCode, setGameCode, normalizeGameCode } from './shared.js';
 import { toggleAreaEditor } from './map.js';
 
 export function initSettings(resetCallback) {
@@ -168,6 +169,23 @@ export function initSettings(resetCallback) {
         });
       }
     });
+  });
+
+  // ── Game code ─────────────────────────────────────────────────────
+  const codeLabel = document.getElementById('game-code-label');
+  const codeInput = document.getElementById('game-code-input');
+  const codeBtn   = document.getElementById('game-code-btn');
+
+  if (codeLabel) codeLabel.textContent = 'Current code: ' + (getGameCode() || '—');
+
+  if (codeBtn) codeBtn.addEventListener('click', () => {
+    const code = normalizeGameCode(codeInput.value);
+    if (!code) return;
+    if (!window.confirm('Switch to game code "' + code + '"?\n\nThe app will reload and connect to that game\'s data.')) return;
+    setGameCode(code);
+    // Firebase listeners are bound to the old path — a reload is the
+    // clean way to reconnect everything under the new code
+    window.location.reload();
   });
 
   // ── Area editor (admin) ───────────────────────────────────────────

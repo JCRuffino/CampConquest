@@ -25,6 +25,25 @@ export function setMyTeam(t) {
   else localStorage.setItem('myTeam', String(t));
 }
 
+// ── GAME CODE ─────────────────────────────────────────────────────
+// The secret code that namespaces all data in Firebase
+// (camp/<code>/…). The security rules only allow access under the
+// right code, so the public repo exposes nothing — see README.
+export function getGameCode() {
+  return localStorage.getItem('gameCode') || null;
+}
+
+export function setGameCode(code) {
+  if (!code) localStorage.removeItem('gameCode');
+  else localStorage.setItem('gameCode', code);
+}
+
+// Lowercase letters/digits/dashes only, so it's always a valid
+// Firebase path segment and there's no ambiguity when typing it
+export function normalizeGameCode(s) {
+  return String(s || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+}
+
 // Areas merged from areas.js geometry + challenges.csv text:
 // { name, polygon, initialChallenge, controlChallenge }
 export const allAreas  = [];

@@ -483,6 +483,20 @@
       </div>
 
       <div class="settings-card">
+        <div class="settings-card-title">🔑 Game Code</div>
+        <div class="settings-card-desc">
+          The secret code that connects you to the game's data. Everyone in the game
+          must use the same code.
+        </div>
+        <div id="game-code-label" style="font-size:13px;font-weight:700;color:#374151;margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="game-code-input" maxlength="30" placeholder="New game code"
+            style="flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;outline:none;" />
+          <button id="game-code-btn" class="btn btn-primary btn-sm">Change</button>
+        </div>
+      </div>
+
+      <div class="settings-card">
         <div class="settings-card-title">✏️ Team Names</div>
         <div class="settings-card-desc">Rename teams (max 12 characters).</div>
         <div class="team-name-row">

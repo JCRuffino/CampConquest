@@ -1,13 +1,12 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, push, onValue, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { sanitiseForFirebase, fixArrays } from './shared.js';
+import { sanitiseForFirebase, fixArrays, getGameCode } from './shared.js';
 
 // ── FIREBASE CONFIG ───────────────────────────────────────────────
-// Reuses the jet-lag-brighton Firebase project, but everything lives
-// under the 'camp/' subtree so the old Brighton game data is untouched.
-// The project's security rules must grant access to that subtree —
-// see README.md for the rules snippet to paste into the console.
+// Reuses the jet-lag-brighton Firebase project. This config is public
+// by design — the data is protected by the security rules, which only
+// allow access under camp/<secret game code>. See README.md.
 const firebaseConfig = {
   apiKey: "AIzaSyBe7IAmaDto4_bJzw2O34SPyyaXYyP9sR8",
   authDomain: "jet-lag-brighton.firebaseapp.com",
@@ -19,7 +18,11 @@ const firebaseConfig = {
   measurementId: "G-7BMEMN7QND"
 };
 
-const DB_ROOT = 'camp';
+// All data lives under camp/<game code> — the code is entered by each
+// player on first load and is never committed to the repo
+function DB_ROOT() {
+  return 'camp/' + getGameCode();
+}
 
 const app  = initializeApp(firebaseConfig);
 const db   = getDatabase(app);
@@ -47,7 +50,7 @@ function getDeviceId() {
 export async function pushState(gs) {
   await authReady;
   const clean = sanitiseForFirebase(gs);
-  return set(ref(db, DB_ROOT + '/gameState'), clean);
+  return set(ref(db, DB_ROOT() + '/gameState'), clean);
 }
 
 // Atomic mutation — runs `mutator` against the server's current state
@@ -57,7 +60,7 @@ export async function pushState(gs) {
 // abort (e.g. a validation check failed against the latest state).
 export async function mutateState(mutator) {
   await authReady;
-  const result = await runTransaction(ref(db, DB_ROOT + '/gameState'), (current) => {
+  const result = await runTransaction(ref(db, DB_ROOT() + '/gameState'), (current) => {
     if (current === null) return undefined;
     fixArrays(current);
     const updated = mutator(current);
@@ -72,7 +75,7 @@ export function listenToGameState(callback, onError) {
   authReady
     .then(() => {
       onValue(
-        ref(db, DB_ROOT + '/gameState'),
+        ref(db, DB_ROOT() + '/gameState'),
         (snapshot) => {
           if (snapshot.exists()) callback(snapshot.val());
           else callback(null);
@@ -93,7 +96,7 @@ export function listenToGameState(callback, onError) {
 export async function pushPlayerLocation(team, lat, lng, name) {
   await authReady;
   const id = getDeviceId();
-  return set(ref(db, DB_ROOT + '/playerLocations/' + id), {
+  return set(ref(db, DB_ROOT() + '/playerLocations/' + id), {
     team, lat, lng, name,
     ts: Date.now()
   });
@@ -102,13 +105,13 @@ export async function pushPlayerLocation(team, lat, lng, name) {
 export async function removePlayerLocation() {
   await authReady;
   const id = getDeviceId();
-  return remove(ref(db, DB_ROOT + '/playerLocations/' + id));
+  return remove(ref(db, DB_ROOT() + '/playerLocations/' + id));
 }
 
 // ── PLAYER LOCATIONS READ ─────────────────────────────────────────
 export function listenToPlayerLocations(callback) {
   authReady.then(() => {
-    onValue(ref(db, DB_ROOT + '/playerLocations'), (snapshot) => {
+    onValue(ref(db, DB_ROOT() + '/playerLocations'), (snapshot) => {
       callback(snapshot.exists() ? snapshot.val() : {});
     });
   });
@@ -117,12 +120,12 @@ export function listenToPlayerLocations(callback) {
 // ── GAME LOG WRITE ────────────────────────────────────────────────
 export async function pushLog(entry) {
   await authReady;
-  return push(ref(db, DB_ROOT + '/gameLog'), entry);
+  return push(ref(db, DB_ROOT() + '/gameLog'), entry);
 }
 
 export async function clearLog() {
   await authReady;
-  return set(ref(db, DB_ROOT + '/gameLog'), null);
+  return set(ref(db, DB_ROOT() + '/gameLog'), null);
 }
 
 // ── GAME LOG READ ─────────────────────────────────────────────────
@@ -132,7 +135,7 @@ export function listenToLog(callback) {
   let cancelled   = false;
   authReady.then(() => {
     if (cancelled) return;
-    unsubscribe = onValue(ref(db, DB_ROOT + '/gameLog'), snap => {
+    unsubscribe = onValue(ref(db, DB_ROOT() + '/gameLog'), snap => {
       const data    = snap.val();
       const entries = data
         ? Object.values(data).sort((a, b) => b.timestamp - a.timestamp)

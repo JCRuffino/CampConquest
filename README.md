@@ -25,26 +25,35 @@ Built with vanilla JavaScript (ES modules), [Leaflet](https://leafletjs.com/) + 
 2. **Challenges** — edit `challenges.csv` (tab-separated). The `Area` column must exactly match the `name` in `areas.js`.
 3. **Site illustration (optional)** — to use a nicer hand-drawn map instead of raw OSM tiles, drop the image in this folder and set `SITE_IMAGE` at the top of `map.js` with the image URL and the lat/lng bounds it covers.
 
-## Firebase
+## Firebase & security
 
-The app reuses the existing `jet-lag-brighton` Firebase project, but stores everything under the `camp/` subtree so the old Brighton game data is untouched. The project's Realtime Database **security rules must grant access to that subtree** — in the Firebase console (Realtime Database → Rules), add alongside the existing rules:
+This repo is public, so the Firebase config in `firebase.js` is public too. That's fine — Firebase web API keys are identifiers, not secrets. What protects the data is the combination of:
+
+1. **A secret game code**, entered once per device when the app first loads (never committed to this repo). All data lives under `camp/<code>/…` in the database.
+2. **Security rules that only allow access under the right code.** Firebase denies everything not explicitly allowed, and rules are not readable by clients — so without the code, the database cannot be read, written, or enumerated, even with the config from this repo.
+
+In the Firebase console (Realtime Database → Rules), set the rules to the following, replacing `YOUR-GAME-CODE` with your chosen code (lowercase letters, numbers and dashes only — pick something unguessable, e.g. `bushy-wood-x7k2m`):
 
 ```json
 {
   "rules": {
     "camp": {
-      "gameState": { ".read": "auth != null", ".write": "auth != null" },
-      "gameLog":   { ".read": "auth != null", ".write": "auth != null" },
-      "playerLocations": {
-        ".read": "auth != null",
-        "$uid": { ".write": "auth != null && auth.uid === $uid" }
+      "YOUR-GAME-CODE": {
+        "gameState": { ".read": "auth != null", ".write": "auth != null" },
+        "gameLog":   { ".read": "auth != null", ".write": "auth != null" },
+        "playerLocations": {
+          ".read": "auth != null",
+          "$uid": { ".write": "auth != null && auth.uid === $uid" }
+        }
       }
     }
   }
 }
 ```
 
-(Keep whatever rules already exist for the old game; just add the `camp` block next to them.)
+Then tell the players the code (in person / group chat — not in anything public). Easiest onboarding: share a link with the code baked in, e.g. `https://<your-host>/CampConquest/?code=bushy-wood-x7k2m` — the app stores the code and cleans the URL. A device with the wrong code shows `🔴 Wrong game code?` and can change it in Settings → Game Code.
+
+Note: these rules deny everything else in the database, including the old Brighton game's paths — its data stays stored but becomes unreachable, and the old app would stop syncing. To keep the old game functional, keep its original rule blocks alongside the `camp` block.
 
 ## Running locally
 

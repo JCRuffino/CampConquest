@@ -3,7 +3,7 @@ import { initMap, addAreas, getMap } from './map.js';
 import { initSettings } from './settings.js';
 import { renderAll } from './ui.js';
 import { allAreas, gameState, fixArrays, toKey, esc, states,
-         formatCountdown } from './shared.js';
+         formatCountdown, getGameCode, setGameCode, normalizeGameCode } from './shared.js';
 import { areaDefinitions } from './areas.js';
 
 function defaultState(areas) {
@@ -20,6 +20,27 @@ function defaultState(areas) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+
+  // ── Game code ──────────────────────────────────────────────────
+  // Everything in Firebase lives under camp/<code>, and the security
+  // rules only allow access with the right code — so nothing works
+  // (and nothing is exposed) without it. Asked once per device; if
+  // dismissed, it can be set later in Settings → Game Code.
+
+  // A shared link like https://…/?code=xyz sets the code directly —
+  // stored, then stripped from the address bar
+  const urlCode = normalizeGameCode(new URLSearchParams(window.location.search).get('code'));
+  if (urlCode) {
+    setGameCode(urlCode);
+    window.history.replaceState(null, '', window.location.pathname);
+  }
+
+  if (!getGameCode()) {
+    const entered = normalizeGameCode(
+      window.prompt('🏕️ Enter the game code\n\n(ask whoever set up the game — letters, numbers and dashes only)')
+    );
+    if (entered) setGameCode(entered);
+  }
 
   const settings = initSettings(() => {
     pushState(defaultState(allAreas));
@@ -278,8 +299,11 @@ document.addEventListener('DOMContentLoaded', () => {
           console.log('🔥 No Firebase data — creating default state');
           pushState(defaultState(allAreas));
         }
-      }, () => {
-        document.getElementById('sync-status').textContent = '🔴 Offline';
+      }, (error) => {
+        // A permission error nearly always means a wrong game code
+        const denied = error && String(error.message || error).toUpperCase().includes('PERMISSION');
+        document.getElementById('sync-status').textContent =
+          denied ? '🔴 Wrong game code?' : '🔴 Offline';
       });
 
     })
