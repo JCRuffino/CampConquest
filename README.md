@@ -69,6 +69,6 @@ Then open the printed local URL in a browser. For the real game, host it anywher
 
 ## How to play
 
-Open the Rules tab in the app for the full rules. In short: complete an area's initial challenge to claim it (or steal it from a team that hasn't locked it), complete its control challenge to lock it forever — but a failed control challenge can never be re-attempted by your team. Most areas when the countdown ends wins; locked areas break ties.
+Open the Rules tab in the app for the full rules. In short: scout a zone by going there (its challenge is hidden until you do), complete the challenge and record your result to claim it, and steal rivals' zones by beating their recorded result — stolen zones lock forever. First to 4 zones in a row wins on the spot; otherwise most zones when the countdown ends (locked zones break ties).
 
 Players with no team assigned act as spectators/admins: they can adjust the timer, reset individual areas from the map popup, trace new areas with the editor, and reset the game (password in `settings.js`).
