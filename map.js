@@ -1,6 +1,7 @@
 import { pushPlayerLocation, removePlayerLocation, listenToPlayerLocations } from './firebase.js';
 import { states, gameState, toKey, getMyTeam, esc, teamName } from './shared.js';
 import { claimArea, lockArea, failControl, adminResetArea } from './actions.js';
+import { siteBoundary } from './areas.js';
 
 let map;
 let userMarker   = null;
@@ -14,12 +15,13 @@ const playerMarkers = {};
 // ── SITE ILLUSTRATION OVERLAY ─────────────────────────────────────
 // When the nicer hand-drawn site map is ready, drop the image in this
 // folder and set e.g.:
-//   const SITE_IMAGE = { url: 'site-map.png', bounds: [[50.9050, -0.1150], [50.9067, -0.1119]] };
+//   const SITE_IMAGE = { url: 'site-map.png', bounds: [[50.8587, 0.2362], [50.8618, 0.2417]] };
 // bounds = [south-west corner, north-east corner] the image stretches over.
 const SITE_IMAGE = null;
 
 export function initMap() {
-  map = L.map('map').setView([50.90582, -0.11345], 17);
+  // Bushy Wood Activity Centre, Hailsham BN27 3LZ
+  map = L.map('map').setView([50.86025, 0.23887], 17);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 20,
@@ -30,6 +32,15 @@ export function initMap() {
   if (SITE_IMAGE) {
     L.imageOverlay(SITE_IMAGE.url, SITE_IMAGE.bounds, { opacity: 0.9 }).addTo(map);
   }
+
+  // Site perimeter (from OpenStreetMap) as a static outline
+  L.polygon(siteBoundary, {
+    color: '#111827',
+    weight: 3,
+    dashArray: '10,8',
+    fill: false,
+    interactive: false,
+  }).addTo(map);
 
   map.locate({ watch: true, enableHighAccuracy: true });
 

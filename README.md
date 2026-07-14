@@ -21,7 +21,7 @@ Built with vanilla JavaScript (ES modules), [Leaflet](https://leafletjs.com/) + 
 
 ## Setting up the real campsite
 
-1. **Location** — the placeholder areas sit on a random field near Ditchling Beacon. Once at (or planning) the real site, open the app as an admin (no team assigned), go to Settings → **Area Editor**, tap the corners of each real area on the map, and press Finish. Paste the generated snippets into `areas.js`, replacing the placeholders.
+1. **Location** — the game is set at **Bushy Wood Activity Centre**, Baden Powell Way, Hailsham BN27 3LZ. The 12 areas in `areas.js` tile the real site boundary (from OpenStreetMap) as a grid with placeholder names. To replace them with the real zones (lodges, campfire circle, archery range…), open the app as an admin (no team assigned), go to Settings → **Area Editor**, tap the corners of each real area on the map, and press Finish. Paste the generated snippets into `areas.js`, replacing the placeholders — and update the names in `challenges.csv` to match.
 2. **Challenges** — edit `challenges.csv` (tab-separated). The `Area` column must exactly match the `name` in `areas.js`.
 3. **Site illustration (optional)** — to use a nicer hand-drawn map instead of raw OSM tiles, drop the image in this folder and set `SITE_IMAGE` at the top of `map.js` with the image URL and the lat/lng bounds it covers.
 
