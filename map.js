@@ -2,7 +2,7 @@ import { pushPlayerLocation, removePlayerLocation, listenToPlayerLocations } fro
 import { states, gameState, toKey, getMyTeam, esc, teamName,
          isVisited, pointInPolygon } from './shared.js';
 import { claimArea, failChallenge, scoutArea, adminResetArea } from './actions.js';
-import { siteBoundary, connections } from './areas.js';
+import { siteBoundary, linkSeams } from './areas.js';
 
 let map;
 let userMarker   = null;
@@ -86,6 +86,16 @@ function autoScout(latlng) {
 
 // ── AREA POLYGONS ─────────────────────────────────────────────────
 export function addAreas(areas) {
+  // Ground that belongs to no zone (gaps between unlinked zones, the
+  // southern woodland) renders as light grey hatching: the site polygon
+  // with every zone cut out as a hole, drawn under the zones
+  const noMansLand = L.polygon(
+    [siteBoundary].concat(areas.map(a => a.polygon)),
+    { stroke: false, fillColor: '#9ca3af', fillOpacity: 0.45, interactive: false }
+  ).addTo(map);
+  ensureHatchPatterns();
+  if (noMansLand._path) noMansLand._path.setAttribute('fill', 'url(#hatch-0)');
+
   areas.forEach(area => {
     const key = toKey(area.name);
 
@@ -110,7 +120,7 @@ export function addAreas(areas) {
     areaLayers[key] = { area, polygon, label };
   });
 
-  drawConnections();
+  drawLinkSeams();
 
   // Frame the whole site on first load
   const all = Object.values(areaLayers).map(l => l.polygon.getBounds());
@@ -119,35 +129,14 @@ export function addAreas(areas) {
   }
 }
 
-// The zone connections from areas.js, drawn as short link marks that
-// straddle the shared border between the two zones (a full centre-to-
-// centre web was too busy) — these define which zones count as "next
-// to" each other for the largest-connected-group score
-function drawConnections() {
-  const LINK_HALF_M = 9; // link reaches this many metres into each zone
-  const kx = Math.cos(50.86 * Math.PI / 180);
-
-  connections.forEach(([a, b]) => {
-    const la = areaLayers[toKey(a)];
-    const lb = areaLayers[toKey(b)];
-    if (!la || !lb) return;
-    const c1 = la.polygon.getBounds().getCenter();
-    const c2 = lb.polygon.getBounds().getCenter();
-
-    // unit vector from c1 to c2 in metres
-    let dx = (c2.lng - c1.lng) * 111320 * kx;
-    let dy = (c2.lat - c1.lat) * 111320;
-    const len = Math.hypot(dx, dy) || 1;
-    dx /= len; dy /= len;
-
-    // the zones are split midway between centres, so the midpoint sits
-    // on (or very near) the shared border
-    const mid = [(c1.lat + c2.lat) / 2, (c1.lng + c2.lng) / 2];
-    const p1  = [mid[0] - dy * LINK_HALF_M / 111320, mid[1] - dx * LINK_HALF_M / (111320 * kx)];
-    const p2  = [mid[0] + dy * LINK_HALF_M / 111320, mid[1] + dx * LINK_HALF_M / (111320 * kx)];
-
-    L.polyline([p1, p2], { color: 'white',   weight: 5, opacity: 0.8, lineCap: 'round', interactive: false }).addTo(map);
-    L.polyline([p1, p2], { color: '#374151', weight: 2, opacity: 0.8, lineCap: 'round', interactive: false }).addTo(map);
+// Linked zones share a border; that shared seam is drawn as a "gate"
+// so linked borders read differently from ordinary zone edges.
+// Unlinked neighbours are pulled apart in the data itself, so a gap of
+// grey hatching says "not connected".
+function drawLinkSeams() {
+  linkSeams.forEach(({ seam }) => {
+    L.polyline(seam, { color: 'white',   weight: 7, opacity: 0.9, lineCap: 'round', interactive: false }).addTo(map);
+    L.polyline(seam, { color: '#111827', weight: 2.5, opacity: 0.75, dashArray: '4,6', lineCap: 'butt', interactive: false }).addTo(map);
   });
 }
 
@@ -159,7 +148,8 @@ function ensureHatchPatterns() {
   if (!svg || svg.querySelector('#hatch-1')) return;
   const NS   = 'http://www.w3.org/2000/svg';
   const defs = document.createElementNS(NS, 'defs');
-  [1, 2, 3].forEach(t => {
+  // hatch-0 = light grey for no-man's-land; hatch-1..3 = team colours
+  [0, 1, 2, 3].forEach(t => {
     const pattern = document.createElementNS(NS, 'pattern');
     pattern.setAttribute('id', 'hatch-' + t);
     pattern.setAttribute('patternUnits', 'userSpaceOnUse');
@@ -167,9 +157,9 @@ function ensureHatchPatterns() {
     pattern.setAttribute('height', '10');
     pattern.setAttribute('patternTransform', 'rotate(45)');
     const stripe = document.createElementNS(NS, 'rect');
-    stripe.setAttribute('width', '4.5');
+    stripe.setAttribute('width', t === 0 ? '3' : '4.5');
     stripe.setAttribute('height', '10');
-    stripe.setAttribute('fill', states[t].color);
+    stripe.setAttribute('fill', t === 0 ? '#9ca3af' : states[t].color);
     pattern.appendChild(stripe);
     defs.appendChild(pattern);
   });
