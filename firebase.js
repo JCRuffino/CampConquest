@@ -4,18 +4,17 @@ import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/1
 import { sanitiseForFirebase, fixArrays, getGameCode } from './shared.js';
 
 // ── FIREBASE CONFIG ───────────────────────────────────────────────
-// Reuses the jet-lag-brighton Firebase project. This config is public
-// by design — the data is protected by the security rules, which only
-// allow access under camp/<secret game code>. See README.md.
+// This config is public by design — the data is protected by the
+// security rules, which only allow access under
+// camp/<secret game code>. See README.md.
 const firebaseConfig = {
-  apiKey: "AIzaSyBe7IAmaDto4_bJzw2O34SPyyaXYyP9sR8",
-  authDomain: "jet-lag-brighton.firebaseapp.com",
-  databaseURL: "https://jet-lag-brighton-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "jet-lag-brighton",
-  storageBucket: "jet-lag-brighton.firebasestorage.app",
-  messagingSenderId: "405662637735",
-  appId: "1:405662637735:web:dd81a06ecf63fd7f570582",
-  measurementId: "G-7BMEMN7QND"
+  apiKey: "AIzaSyD_yYZDs-fEBsLYYoflFZ4u5ZdsGM46d-o",
+  authDomain: "campconquest.firebaseapp.com",
+  databaseURL: "https://campconquest-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "campconquest",
+  storageBucket: "campconquest.firebasestorage.app",
+  messagingSenderId: "191567680796",
+  appId: "1:191567680796:web:36c74453c5fdebc27516d9"
 };
 
 // All data lives under camp/<game code> — the code is entered by each
