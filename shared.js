@@ -1,3 +1,5 @@
+import { winLines } from './areas.js';
+
 export const states = [
   { label: "Unclaimed", color: "#808080" },
   { label: "Team A",    color: "#e63946" },
@@ -88,29 +90,21 @@ export function pointInPolygon(lat, lng, polygon) {
 }
 
 // ── WIN CONDITION ─────────────────────────────────────────────────
-// First team with WIN_LENGTH owned areas in a straight line (using the
-// row/col grid positions from areas.js) wins — locked or not.
-// Returns [key, key, …] of the winning line, or null.
+// First team owning WIN_LENGTH CONSECUTIVE zones within one of the
+// winLines defined in areas.js wins — locked or not.
+// Returns [key, key, …] of the winning stretch, or null.
 export function findWinningLine(gs, team) {
-  const cells = {};
-  allAreas.forEach(a => {
-    if (a.row == null || a.col == null) return;
-    const key = toKey(a.name);
-    const st  = gs.areas && gs.areas[key];
-    if (st && st.owner === team) cells[a.row + ',' + a.col] = key;
-  });
-
-  const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
-  for (const start of Object.keys(cells)) {
-    const [r, c] = start.split(',').map(Number);
-    for (const [dr, dc] of dirs) {
-      const line = [];
-      for (let i = 0; i < WIN_LENGTH; i++) {
-        const k = cells[(r + dr * i) + ',' + (c + dc * i)];
-        if (!k) break;
-        line.push(k);
+  for (const line of winLines) {
+    const keys = line.map(toKey);
+    let run = [];
+    for (const k of keys) {
+      const st = gs.areas && gs.areas[k];
+      if (st && st.owner === team) {
+        run.push(k);
+        if (run.length >= WIN_LENGTH) return run.slice(-WIN_LENGTH);
+      } else {
+        run = [];
       }
-      if (line.length === WIN_LENGTH) return line;
     }
   }
   return null;

@@ -259,8 +259,6 @@ document.addEventListener('DOMContentLoaded', () => {
         allAreas.push({
           name:      def.name,
           polygon:   def.polygon,
-          row:       def.row,
-          col:       def.col,
           challenge: byName[def.name] || '',
         });
       });

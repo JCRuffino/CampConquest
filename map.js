@@ -2,7 +2,7 @@ import { pushPlayerLocation, removePlayerLocation, listenToPlayerLocations } fro
 import { states, gameState, toKey, getMyTeam, esc, teamName,
          isVisited, pointInPolygon } from './shared.js';
 import { claimArea, scoutArea, adminResetArea } from './actions.js';
-import { siteBoundary } from './areas.js';
+import { siteBoundary, winLines } from './areas.js';
 
 let map;
 let userMarker   = null;
@@ -110,6 +110,8 @@ export function addAreas(areas) {
     areaLayers[key] = { area, polygon, label };
   });
 
+  drawWinLines();
+
   // Frame the whole site on first load
   const all = Object.values(areaLayers).map(l => l.polygon.getBounds());
   if (all.length) {
@@ -117,14 +119,34 @@ export function addAreas(areas) {
   }
 }
 
+// The win lines from areas.js, drawn zone-centre to zone-centre so
+// players can see exactly which runs of 4 win the game
+function drawWinLines() {
+  winLines.forEach(line => {
+    const pts = line
+      .map(name => areaLayers[toKey(name)])
+      .filter(Boolean)
+      .map(l => l.polygon.getBounds().getCenter());
+    if (pts.length < 2) return;
+    // white casing under a dark dotted line keeps it readable on any fill
+    L.polyline(pts, { color: 'white',   weight: 6, opacity: 0.75, interactive: false }).addTo(map);
+    L.polyline(pts, { color: '#111827', weight: 2.5, opacity: 0.8, dashArray: '1,8', lineCap: 'round', interactive: false }).addTo(map);
+    pts.forEach(p => {
+      L.circleMarker(p, {
+        radius: 4, color: 'white', weight: 2, fillColor: '#111827',
+        fillOpacity: 0.9, interactive: false,
+      }).addTo(map);
+    });
+  });
+}
+
 function styleFor(owner, locked) {
   const color = states[owner].color;
   return {
-    color:       owner === 0 ? '#6b7280' : color,
-    weight:      locked ? 4 : 2,
-    dashArray:   owner === 0 ? '5,6' : null,
+    color:       owner === 0 ? '#9ca3af' : color,
+    weight:      locked ? 4 : (owner === 0 ? 1.5 : 2.5),
     fillColor:   color,
-    fillOpacity: owner === 0 ? 0.08 : (locked ? 0.55 : 0.3),
+    fillOpacity: owner === 0 ? 0.04 : (locked ? 0.55 : 0.3),
   };
 }
 
@@ -383,20 +405,9 @@ function finishEditorArea() {
   const name = window.prompt('Name for this area?');
   if (!name) return;
 
-  // Grid position drives the 4-in-a-row win condition
-  const gridRaw = window.prompt(
-    'Grid position for the 4-in-a-row win, as "row,col"\n' +
-    '(row 0 = southernmost row, col 0 = westernmost column):'
-  ) || '';
-  const gridMatch = gridRaw.match(/(\d+)\s*,\s*(\d+)/);
-  const gridLine  = gridMatch
-    ? '    row: ' + gridMatch[1] + ', col: ' + gridMatch[2] + ',\n'
-    : '    row: 0, col: 0, // ⚠️ TODO: set the grid position\n';
-
   const snippet =
     '  {\n' +
     '    name: "' + name.replace(/"/g, '\\"') + '",\n' +
-    gridLine +
     '    polygon: [\n' +
     editorPoints.map(p => '      [' + p[0] + ', ' + p[1] + '],').join('\n') + '\n' +
     '    ],\n' +
