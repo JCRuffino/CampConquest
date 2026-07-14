@@ -1,13 +1,10 @@
-import { states, gameState, toKey, getMyTeam, esc, teamName, allAreas,
-         getScores, rankTeams, isVisited } from './shared.js';
+import { states, esc, teamName, getScores, rankTeams } from './shared.js';
 import { updateAreaLayers } from './map.js';
-import { claimArea, failChallenge, scoutArea } from './actions.js';
 
 export function renderAll(gs) {
   updateLeaderboard(gs);
   updateMapScoreboard(gs);
   updateAreaLayers(gs);
-  renderAreasPanel(gs);
 }
 
 // Mini scoreboard on the map: per team, the size of its largest
@@ -86,143 +83,4 @@ function updateLeaderboard(gs) {
       detailEl.appendChild(row);
     });
   }
-}
-
-// ── AREAS SCREEN ──────────────────────────────────────────────────
-// One card per area: status, the challenge (if scouted), the result to
-// beat, and the same actions as the map popup
-function renderAreasPanel(gs) {
-  const list = document.getElementById('areas-list');
-  if (!list) return;
-
-  const myTeam  = getMyTeam();
-  const isAdmin = myTeam === null;
-  list.innerHTML = '';
-
-  allAreas.forEach(area => {
-    const key = toKey(area.name);
-    const a   = gs.areas && gs.areas[key];
-    if (!a) return;
-
-    const expected    = { owner: a.owner, locked: !!a.locked };
-    const isUnclaimed = a.owner === 0;
-    const isMine      = myTeam !== null && a.owner === myTeam;
-    const iFailed     = myTeam !== null && (a.failedBy || []).includes(myTeam);
-    const revealed    = isAdmin || isVisited(gs, myTeam, key);
-
-    const chipColor = a.locked ? '#9b59b6' : states[a.owner].color;
-    const chipText  = a.locked
-      ? '🔒 ' + teamName(gs, a.owner)
-      : isUnclaimed ? 'Unclaimed' : teamName(gs, a.owner);
-
-    let challengeHTML;
-    if (revealed) {
-      challengeHTML =
-        '<div style="font-size:12px;color:#374151;margin-top:6px;line-height:1.5;">' +
-          '<span style="font-weight:700;color:#f4a300;">⚡ Challenge:</span> ' +
-          esc(area.challenge || '—') +
-        '</div>' +
-        (area.passMark
-          ? '<div style="font-size:12px;color:#374151;margin-top:4px;">' +
-              '<span style="font-weight:700;">🎯 Pass mark:</span> ' + esc(area.passMark) +
-            '</div>'
-          : '') +
-        (!isUnclaimed
-          ? '<div style="font-size:12px;color:#374151;margin-top:4px;">' +
-              '<span style="font-weight:700;">🏅 Result to beat:</span> ' + esc(a.result || '—') +
-            '</div>'
-          : '') +
-        ((a.failedBy || []).length > 0
-          ? '<div style="font-size:11px;color:#9ca3af;margin-top:4px;">Locked out (failed): ' +
-            (a.failedBy || []).map(t => esc(teamName(gs, t))).join(', ') + '</div>'
-          : '');
-    } else {
-      challengeHTML =
-        '<div style="font-size:12px;color:#9ca3af;margin-top:6px;font-style:italic;">' +
-          '❓ Not scouted yet — go there to reveal the challenge.' +
-        '</div>';
-    }
-
-    let buttonsHTML = '';
-    if (!a.locked && myTeam !== null && !isMine && revealed && !iFailed) {
-      buttonsHTML =
-        '<div class="card-buttons" style="margin-top:10px;">' +
-          '<button class="btn" data-action="claim" style="background:' + states[myTeam].color + ';">' +
-            (isUnclaimed ? '⛺ Claim' : '😈 Steal & Lock') +
-          '</button>' +
-          '<button class="btn btn-neutral" data-action="fail">❌ We Failed</button>' +
-        '</div>';
-    } else if (myTeam !== null && !revealed) {
-      buttonsHTML =
-        '<div class="card-buttons" style="margin-top:10px;">' +
-          '<button class="btn btn-amber" data-action="scout">📍 We\'re Here — Reveal</button>' +
-        '</div>';
-    }
-
-    const statusNote = a.locked
-      ? '<div style="font-size:11px;color:#9ca3af;margin-top:6px;">Stolen areas are locked for the rest of the game.</div>'
-      : (isMine
-        ? '<div style="font-size:11px;color:#9ca3af;margin-top:6px;">Yours — another team can steal it by beating your result.</div>'
-        : (iFailed
-          ? '<div style="font-size:11px;color:#e63946;font-weight:600;margin-top:6px;">❌ Your team failed here — locked out until another team passes it.</div>'
-          : ''));
-
-    const card = document.createElement('div');
-    card.className = 'challenge-card';
-    card.innerHTML =
-      '<div class="card-title">' +
-        '<span class="card-badge" style="background:' + chipColor + ';">' + esc(chipText) + '</span>' +
-        esc(area.name) +
-      '</div>' +
-      challengeHTML +
-      statusNote +
-      '<div class="error-msg"></div>' +
-      buttonsHTML;
-
-    const errorEl = card.querySelector('.error-msg');
-    function showError(msg) {
-      errorEl.textContent   = msg;
-      errorEl.style.display = 'block';
-    }
-
-    const claimBtn = card.querySelector('[data-action="claim"]');
-    if (claimBtn) claimBtn.addEventListener('click', async () => {
-      const confirmMsg = isUnclaimed
-        ? '⛺ Claim ' + area.name + '?\n\nOnly press this once your team has genuinely completed the challenge!'
-        : '😈 Steal ' + area.name + '?\n\nOnly press this if your team genuinely BEAT the result "' +
-          (a.result || '—') + '".\nStolen areas lock permanently!';
-      if (!window.confirm(confirmMsg)) return;
-      const result = window.prompt(
-        '🎯 What result did your team get?\n(e.g. "14 catches", "38 seconds" — this is what others must beat)'
-      );
-      if (result === null) return;
-      const trimmed = result.trim().slice(0, 60);
-      if (!trimmed) { showError('You must record a result.'); return; }
-      const res = await claimArea(key, myTeam, expected, trimmed);
-      if (!res.ok && res.reason) showError(res.reason);
-    });
-
-    const failBtn = card.querySelector('[data-action="fail"]');
-    if (failBtn) failBtn.addEventListener('click', async () => {
-      const ok = window.confirm(
-        '❌ Record a FAILED attempt at ' + area.name + '?\n\n' +
-        'Your team won\'t be able to attempt this challenge again until another team passes it.'
-      );
-      if (!ok) return;
-      const res = await failChallenge(key, myTeam, expected);
-      if (!res.ok && res.reason) showError(res.reason);
-    });
-
-    const scoutBtn = card.querySelector('[data-action="scout"]');
-    if (scoutBtn) scoutBtn.addEventListener('click', async () => {
-      const ok = window.confirm(
-        '📍 Reveal the challenge at ' + area.name + '?\n\n' +
-        'Honour system: only do this if your team is genuinely AT this area.'
-      );
-      if (!ok) return;
-      await scoutArea(key, myTeam, false);
-    });
-
-    list.appendChild(card);
-  });
 }

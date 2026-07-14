@@ -1,21 +1,21 @@
-Area	Challenge	Pass Mark
+Area	Challenge	Pass Mark	Timer
 Main Campfire	Placeholder: longest continuous campfire song medley without stopping or repeating a song (record the time).	2 minutes
-Social Deduction Glade	Placeholder: win a round of a social deduction mini-game against volunteers — fastest correct accusation (record the time).	Under 5 minutes
-Village Square	Placeholder: most items borrowed from strangers in the square in 5 minutes, returned after (record the count).	5 items
-Arena	Placeholder: most keepy-uppies / consecutive catches in the arena (record the count).	10
-Beeches	Placeholder: tallest freestanding stick tower (record height: knee/waist/chest/head).	Knee height
+Social Deduction Glade	Placeholder: win a round of a social deduction mini-game against volunteers — fastest correct accusation wins steals (record your time).	Under 5 minutes	countup
+Village Square	Placeholder: most items borrowed from strangers in the square before the timer runs out, returned after (record the count).	5 items	countdown 5
+Arena	Placeholder: most keepy-uppies / consecutive catches in a single run before the timer runs out (record the count).	10	countdown 5
+Beeches	Placeholder: tallest freestanding stick tower you can build before the timer runs out (record height: knee/waist/chest/head).	Knee height	countdown 10
 Chapel	Placeholder: recite a made-up 30-second sermon — rated 1-10 by a neutral player (record the score).	5
 RPG Glade	Placeholder: most convincing monster impression rated 1-10 by a neutral player (record the score).	5
 Willows 1	Placeholder: most star jumps in 60 seconds (record the number).	30
 Birches 1	Placeholder: furthest welly throw (record the distance in paces).	15 paces
-Oaks 1	Placeholder: fastest tongue twister said 3 times without a mistake (record the time).	Under 30 seconds
-Meadow	Placeholder: longest handstand or headstand in the meadow (record the time).	5 seconds
+Oaks 1	Placeholder: say the tongue twister 3 times without a mistake — the timer starts now, stop it when you're done (record your time).	Under 30 seconds	countup
+Meadow	Placeholder: find and photograph 5 different insects — the timer starts now, stop it when you have all 5 (record your time).	Under 10 minutes	countup
 Willows 4	Placeholder: most thrown grapes caught in the mouth out of 10 (record the count).	4
 Willows 5	Placeholder: longest plank hold (record the time).	60 seconds
-Birches 2	Placeholder: most pieces of kindling collected and stacked in 3 minutes (record the count).	15 pieces
+Birches 2	Placeholder: most pieces of kindling collected and stacked before the timer runs out (record the count).	15 pieces	countdown 5
 Oaks 2	Placeholder: fastest three-legged lap of the glade (record the time).	Under 2 minutes
 Willows 2	Placeholder: longest continuous tree hug without letting go (record the time).	2 minutes
-Birches 3	Placeholder: hide and seek — longest time hidden before your teammate finds you, max 5 minutes (record the time).	2 minutes
-Oaks 3	Placeholder: most bounces of a ball on a frying pan / board without dropping (record the count).	20
+Birches 3	Placeholder: hide and seek — one teammate hides, the other must find them before the timer runs out (record how long they stayed hidden).	2 minutes	countdown 5
+Oaks 3	Placeholder: most bounces of a ball on a frying pan / board without dropping, best run before the timer runs out (record the count).	20	countdown 5
 Oaks 4	Placeholder: longest time standing perfectly still and silent while others try to make you laugh (record the time).	60 seconds
-Chestnut	Placeholder: build a den big enough for one teammate to hide inside — fastest build (record the time).	Under 10 minutes
+Chestnut	Placeholder: build a den big enough for one teammate to hide inside before the timer runs out.	Hides one teammate	countdown 10

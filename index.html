@@ -118,8 +118,6 @@
     .screen.active { display: block; }
     #screen-map { overflow: hidden; }
     #map { width: 100%; height: 100%; }
-    #screen-areas { padding: 14px; background: #f0f2f5; }
-    #screen-areas .areas-container { max-width: 480px; margin: 0 auto; }
     #screen-leaderboard { padding: 14px; background: #f0f2f5; }
     #screen-settings { padding: 0; background: #f0f2f5; }
 
@@ -439,14 +437,6 @@
     <div id="map-scoreboard"></div>
   </div>
 
-  <!-- AREAS -->
-  <div id="screen-areas" class="screen">
-    <div class="areas-container">
-      <div class="section-title">🏕️ Campsite Areas</div>
-      <div id="areas-list"></div>
-    </div>
-  </div>
-
   <!-- LEADERBOARD -->
   <div id="screen-leaderboard" class="screen">
     <div style="padding: 14px; max-width: 400px; margin: 0 auto;">
@@ -534,12 +524,28 @@
         <div style="font-size:11px;color:#9ca3af;margin-top:8px;">Only an admin (no team assigned) can adjust or cancel a running countdown.</div>
       </div>
 
+      <div class="settings-card">
+        <div class="settings-card-title">🛠️ Admin</div>
+        <div id="admin-status" class="settings-card-desc" style="margin-bottom:10px;">
+          Enter the admin password to unlock admin controls.
+        </div>
+        <div id="admin-unlock-row" style="display:flex;gap:8px;">
+          <input type="password" id="admin-password-input" placeholder="Admin password"
+            style="flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;outline:none;" />
+          <button id="admin-unlock-btn" class="btn btn-amber btn-sm">Unlock</button>
+        </div>
+        <div id="admin-password-error" style="font-size:12px;color:#e63946;font-weight:600;margin-top:6px;display:none;">
+          ❌ Incorrect password
+        </div>
+        <button id="admin-lock-btn" class="btn btn-ghost btn-sm" style="display:none;margin-top:4px;">🔒 Lock admin mode</button>
+      </div>
+
       <div class="settings-card" id="editor-card" style="display:none;">
         <div class="settings-card-title">✏️ Area Editor (Admin)</div>
         <div class="settings-card-desc">
-          Trace the real campsite areas: start the editor, tap the corners of an area on
-          the map, then press Finish. The snippet to paste into <strong>areas.js</strong>
-          appears below and is copied to the clipboard.
+          Adjust a zone's shape: start the editor, tap a zone on the map, then drag its
+          corner handles. Press Copy Snippet and paste it over that zone's entry in
+          <strong>areas.js</strong> (changes only apply to everyone once areas.js is updated).
         </div>
         <button id="editor-toggle-btn" class="btn btn-amber btn-full">✏️ Start Area Editor</button>
         <div style="display:none;margin-top:10px;">
@@ -549,35 +555,10 @@
         </div>
       </div>
 
-      <div class="settings-card settings-card-danger">
-        <div class="settings-card-title">🔴 Reset Game</div>
+      <div class="settings-card settings-card-danger" id="reset-card" style="display:none;">
+        <div class="settings-card-title">🔴 Reset Game (Admin)</div>
         <div class="settings-card-desc">Full reset to start a new game — all areas back to unclaimed.</div>
         <button id="reset-btn" class="btn btn-danger btn-full">Reset Game</button>
-        <div id="reset-blocked-msg" class="reset-blocked-msg" style="display:none;">
-          ⚠️ Unassign yourself before resetting.
-        </div>
-      </div>
-
-      <div id="reset-overlay" class="modal-overlay">
-        <div class="modal-box">
-          <div class="modal-title">⚠️ Reset Game?</div>
-          <p style="font-size:13px;color:#6b7280;margin:6px 0 16px;line-height:1.5;">
-            This resets every area to unclaimed and clears the history. Enter the password to confirm.
-          </p>
-          <input
-            id="reset-password-input"
-            type="password"
-            placeholder="Enter password"
-            style="width:100%;padding:9px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;margin-bottom:6px;outline:none;font-family:inherit;transition:border-color 0.15s;"
-          />
-          <div id="reset-password-error" style="font-size:12px;color:#e63946;font-weight:600;margin-bottom:12px;display:none;">
-            ❌ Incorrect password
-          </div>
-          <div style="display:flex;gap:10px;">
-            <button id="reset-confirm-btn" class="btn btn-danger" style="flex:1;">Yes, Reset</button>
-            <button id="reset-cancel-btn" class="btn btn-ghost" style="flex:1;">Cancel</button>
-          </div>
-        </div>
       </div>
 
     </div>
@@ -592,23 +573,24 @@
         <div class="accordion-item">
           <button class="accordion-btn">🎯 Objective</button>
           <div class="accordion-body">
-            <p>Build the biggest <strong>connected group</strong> of areas. Areas that share a marked border (the dashed white gate lines) count as next to each other; areas separated by a hatched grey gap do not. Your score is the size of your largest group of linked areas, and the team with the biggest group when the countdown ends wins.</p>
+            <p>Build the biggest <strong>connected group</strong> of areas. Areas that touch each other count as next to each other; areas separated by a hatched grey gap do not. Your score is the size of your largest group of linked areas, and the team with the biggest group when the countdown ends wins.</p>
             <p>Both locked and unlocked areas count. Ties are broken by total areas controlled, then by locked areas.</p>
           </div>
         </div>
 
         <div class="accordion-item">
-          <button class="accordion-btn">🔍 Scouting</button>
+          <button class="accordion-btn">▶️ Starting a Challenge</button>
           <div class="accordion-body">
-            <p>Every area has a challenge, but it's hidden until your team has been there. Walk into an area and it reveals itself automatically (via GPS) — or use the "We're Here" button if GPS is being slow under the trees.</p>
-            <p>Areas your team hasn't scouted show a ❓ on the map.</p>
+            <p>Every area's challenge is <strong>secret</strong> until your team presses <strong>Start Challenge Attempt</strong> at that area. Starting reveals the challenge — and commits your team: you must then record either a pass or a fail.</p>
+            <p>Some challenges are timed. A countdown challenge gives you a fixed window (e.g. 5 or 10 minutes) from the moment you press Start; a count-up challenge races the clock, and your time is your result. The live timer shows in the area's popup on everyone's phone.</p>
+            <p>Only press Start when your team is actually at the area and ready to go.</p>
           </div>
         </div>
 
         <div class="accordion-item">
           <button class="accordion-btn">⛺ Claiming Areas</button>
           <div class="accordion-body">
-            <p>Go to an unclaimed area and attempt its challenge. Every challenge has a <strong>pass mark</strong> — reach it and you claim the area, recording your <strong>result</strong> (a number, time, distance…) which becomes the score other teams must beat to steal it from you.</p>
+            <p>Every challenge has a <strong>pass mark</strong> — reach it and you claim the area, recording your <strong>result</strong> (a number, time, distance…) which becomes the score other teams must beat to steal it from you.</p>
             <p>Fall short of the pass mark and you must record a <strong>fail</strong>: your team can't attempt that area's challenge again until another team passes it (by claiming or stealing the area — that resets everyone's fails there).</p>
             <p>Teams are on their honour — record claims, results and fails honestly!</p>
           </div>
@@ -626,7 +608,7 @@
           <button class="accordion-btn">👥 Teams</button>
           <div class="accordion-body">
             <p>Three teams of two players. Join your team in Settings — your live location is then shared on the map so everyone can see where the action is.</p>
-            <p>Anyone with no team assigned is a spectator/admin: they see all challenges, can adjust the timer, fix mistakes on any area, and reset the game.</p>
+            <p>The game admin (unlocked with a password in Settings) can see all challenges, adjust the timer, fix mistakes on any area, and reset the game.</p>
           </div>
         </div>
 
@@ -661,7 +643,7 @@
           <option value="all">All Types</option>
           <option value="claim">⛺ Claims</option>
           <option value="steal">😈 Steals</option>
-          <option value="scout">🔍 Scouting</option>
+          <option value="attempt">▶️ Attempts &amp; Fails</option>
           <option value="timer">⏱️ Game events</option>
         </select>
       </div>
@@ -679,9 +661,6 @@
   <div id="nav-bar">
     <button class="nav-btn active" data-screen="map">
       <span class="nav-icon">🗺️</span>Map
-    </button>
-    <button class="nav-btn" data-screen="areas">
-      <span class="nav-icon">🏕️</span>Areas
     </button>
     <button class="nav-btn" data-screen="leaderboard">
       <span class="nav-icon">🏆</span>Leaderboard

@@ -66,11 +66,27 @@ export function findArea(key) {
   return allAreas.find(a => toKey(a.name) === key) || null;
 }
 
-// ── SCOUTING ──────────────────────────────────────────────────────
-// A team only sees an area's challenge once one of its players has
-// been there (gs.visited[team][key] = true)
-export function isVisited(gs, team, key) {
-  return !!(gs && gs.visited && gs.visited[team] && gs.visited[team][key]);
+// ── ADMIN MODE ────────────────────────────────────────────────────
+// Unlocked per-device with the admin password (Settings → Admin)
+export function isAdminMode() {
+  return localStorage.getItem('adminMode') === '1';
+}
+
+export function setAdminMode(on) {
+  if (on) localStorage.setItem('adminMode', '1');
+  else localStorage.removeItem('adminMode');
+}
+
+// ── CHALLENGE ATTEMPTS ────────────────────────────────────────────
+// A team only sees an area's challenge text once it has STARTED an
+// attempt there (gs.attempts[team][key] = { startedAt }) — and starting
+// commits the team to recording a pass or a fail
+export function getAttempt(gs, team, key) {
+  return (gs && gs.attempts && gs.attempts[team] && gs.attempts[team][key]) || null;
+}
+
+export function hasStarted(gs, team, key) {
+  return !!getAttempt(gs, team, key);
 }
 
 // Ray-casting point-in-polygon; polygon is [[lat, lng], …]
@@ -156,9 +172,9 @@ export function fixArrays(gs) {
     if (!a.failedBy) a.failedBy = [];
     else if (!Array.isArray(a.failedBy)) a.failedBy = Object.values(a.failedBy);
   });
-  if (!gs.visited) gs.visited = {};
+  if (!gs.attempts) gs.attempts = {};
   [1, 2, 3].forEach(t => {
-    if (!gs.visited[t]) gs.visited[t] = {};
+    if (!gs.attempts[t]) gs.attempts[t] = {};
   });
 }
 

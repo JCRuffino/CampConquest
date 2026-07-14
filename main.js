@@ -18,8 +18,8 @@ function defaultState(areas) {
     };
   });
   return {
-    areas:   areaState,
-    visited: { 1: {}, 2: {}, 3: {} },
+    areas:    areaState,
+    attempts: { 1: {}, 2: {}, 3: {} },
   };
 }
 
@@ -237,17 +237,29 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(r => r.text())
     .then(challengesCsv => {
 
-      // Tab-separated: Area, Challenge, Pass Mark — challenge text can
-      // freely contain commas
+      // Tab-separated: Area, Challenge, Pass Mark, Timer — challenge
+      // text can freely contain commas. Timer values: "countdown N"
+      // (N minutes counting down), "countup" (stopwatch), or empty.
+      function parseTimer(s) {
+        s = (s || '').trim().toLowerCase();
+        if (!s) return null;
+        if (s.includes('countup') || s === 'up') return { mode: 'up' };
+        const m = s.match(/(\d+)/);
+        if (s.includes('countdown') && m) return { mode: 'down', minutes: parseInt(m[1]) };
+        console.warn('⚠️ Unrecognised timer value in challenges.csv:', s);
+        return null;
+      }
+
       const byName = {};
       const lines  = challengesCsv.trim().split('\n');
       lines.shift();
       lines.forEach(line => {
-        const [name, challenge, passMark] = line.split('\t');
+        const [name, challenge, passMark, timer] = line.split('\t');
         if (!name) return;
         byName[name.trim()] = {
           challenge: (challenge || '').trim(),
           passMark:  (passMark || '').trim(),
+          timer:     parseTimer(timer),
         };
       });
 
@@ -259,6 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
           polygon:   def.polygon,
           challenge: ch ? ch.challenge : '',
           passMark:  ch ? ch.passMark : '',
+          timer:     ch ? ch.timer : null,
         });
       });
       console.log('🏕️ Areas loaded:', allAreas.length);

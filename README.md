@@ -2,26 +2,26 @@
 
 A real-time multiplayer territory game played across a campsite, inspired by Jet Lag: The Game's Battle for America / Schengen Showdown — and a follow-up to [BussyBodies](https://github.com/JCRuffino/BussyBodies) (Jet Lag Brighton).
 
-Three teams of two compete over the 20 zones of the Strange Games Festival at Bushy Wood Activity Centre. Every zone has one challenge, hidden until a team has physically been there (revealed by GPS, honour-system button as backup). Complete a zone's challenge and record your **result** to claim it; another team can steal it by beating that result — but a stolen zone **locks permanently**. When the countdown ends, the team with the **largest connected group of zones** (via the dotted links on the map, Stateside Scramble style) wins — ties broken by total zones, then locked zones.
+Three teams of two compete over the 20 zones of the Strange Games Festival at Bushy Wood Activity Centre. Every zone has one secret challenge, revealed only when a team presses Start Challenge Attempt there — which commits them to recording a pass (reaching the pass mark) or a fail (locked out until another team passes it). Some challenges run on a countdown or stopwatch that starts on the spot. Claiming records your **result**; another team can steal the zone by beating that result — but a stolen zone **locks permanently**. When the countdown ends, the team with the **largest connected group of zones** (via the dotted links on the map, Stateside Scramble style) wins — ties broken by total zones, then locked zones.
 
 Built with vanilla JavaScript (ES modules), [Leaflet](https://leafletjs.com/) + OpenStreetMap, and Firebase (anonymous auth + Realtime Database) for shared state.
 
 ## Project structure
 
-- `index.html` — markup and styles for all screens (Map, Areas, Leaderboard, Settings, Rules, History)
+- `index.html` — markup and styles for all screens (Map, Leaderboard, Settings, Rules, History)
 - `main.js` — boot sequence: data loading, Firebase listener, navigation, history screen, timer ticker, toasts
-- `map.js` — Leaflet map, area polygons, claim/steal popups, GPS auto-scouting, live player locations, admin area editor
-- `actions.js` — the claim / steal / scout / admin-reset state changes (Firebase transactions)
-- `ui.js` — Areas screen cards, leaderboard, map scoreboard
-- `settings.js` — team assignment, team renaming, game code, game timer, area editor toggle, game reset
+- `map.js` — Leaflet map, area polygons, challenge popups with live attempt timers, live player locations, admin vertex-drag area editor
+- `actions.js` — the start-attempt / claim / steal / fail / admin state changes (Firebase transactions)
+- `ui.js` — leaderboard and map scoreboard
+- `settings.js` — team assignment, team renaming, game code, game timer, admin unlock (password in this file), area editor toggle, game reset
 - `firebase.js` — Firebase setup, transactional state updates, game log
 - `shared.js` — game state helpers, win detection, and constants shared across modules
 - `areas.js` — the 20 festival zones as named polygons plus the connections between them (which drive the largest-connected-group score); zones are expanded so neighbours visibly touch
-- `challenges.csv` — challenge text per zone (tab-separated: Area, Challenge; results should be measurable so steals can "beat" them)
+- `challenges.csv` — per zone (tab-separated): Area, Challenge, Pass Mark, Timer (`countdown N` minutes, `countup`, or empty); results should be measurable so steals can "beat" them
 
 ## Setting up the real campsite
 
-1. **Zones** — the 20 festival zones in `areas.js` were placed by georeferencing the Strange Games Festival site map onto the real site boundary, so placements are close but not exact. To refine one: open the app as an admin (no team assigned), Settings → **Area Editor**, trace the zone's corners on the map, press Finish, and paste the snippet into `areas.js`.
+1. **Zones** — the 20 festival zones in `areas.js` were placed by georeferencing the Strange Games Festival site map onto the real site boundary, so placements are close but not exact. To refine one: unlock admin mode in Settings, start the **Area Editor**, tap the zone on the map, drag its corner handles, press Copy Snippet, and paste it over that zone's entry in `areas.js`.
 2. **Challenges** — edit `challenges.csv` (tab-separated). The `Area` column must exactly match the `name` in `areas.js`.
 3. **Site illustration (optional)** — to use a nicer hand-drawn map instead of raw OSM tiles, drop the image in this folder and set `SITE_IMAGE` at the top of `map.js` with the image URL and the lat/lng bounds it covers.
 
@@ -69,6 +69,6 @@ Then open the printed local URL in a browser. For the real game, host it anywher
 
 ## How to play
 
-Open the Rules tab in the app for the full rules. In short: scout a zone by going there (its challenge is hidden until you do), complete the challenge and record your result to claim it, and steal rivals' zones by beating their recorded result — stolen zones lock forever. The winner is the team with the largest connected group of zones when the countdown ends (ties: total zones, then locked zones).
+Open the Rules tab in the app for the full rules. In short: a zone's challenge stays secret until you press Start at it (which commits you to a pass or fail and starts any timer), pass to claim it with a recorded result, and steal rivals' zones by beating that result — stolen zones lock forever. The winner is the team with the largest connected group of zones when the countdown ends (ties: total zones, then locked zones).
 
-Players with no team assigned act as spectators/admins: they can adjust the timer, reset individual areas from the map popup, trace new areas with the editor, and reset the game (password in `settings.js`).
+Admin mode (unlocked per device with the password in `settings.js`) can see all challenges, adjust the timer, set any area's owner/lock/result/pass mark from the map popup, edit zone shapes, and reset the game.

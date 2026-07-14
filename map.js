@@ -1,8 +1,8 @@
 import { pushPlayerLocation, removePlayerLocation, listenToPlayerLocations } from './firebase.js';
 import { states, gameState, toKey, getMyTeam, esc, teamName,
-         isVisited, pointInPolygon } from './shared.js';
-import { claimArea, failChallenge, scoutArea, adminResetArea } from './actions.js';
-import { siteBoundary, linkSeams } from './areas.js';
+         hasStarted, getAttempt, isAdminMode, formatCountdown } from './shared.js';
+import { claimArea, failChallenge, startAttempt, adminSetArea } from './actions.js';
+import { siteBoundary } from './areas.js';
 
 let map;
 let userMarker   = null;
@@ -59,29 +59,13 @@ export function initMap() {
         radius, color: '#4285F4', fillOpacity: 0.1, weight: 1
       }).addTo(map);
     }
-    autoScout(e.latlng);
   });
-
-  map.on('click', handleEditorClick);
 
   initPlayerLocationSharing();
 }
 
 export function getMap() {
   return map;
-}
-
-// Walking into an area reveals its challenge to your team
-function autoScout(latlng) {
-  const gs     = gameState.data;
-  const myTeam = getMyTeam();
-  if (!gs || !myTeam) return;
-  Object.entries(areaLayers).forEach(([key, layer]) => {
-    if (isVisited(gs, myTeam, key)) return;
-    if (pointInPolygon(latlng.lat, latlng.lng, layer.area.polygon)) {
-      scoutArea(key, myTeam, true);
-    }
-  });
 }
 
 // ── AREA POLYGONS ─────────────────────────────────────────────────
@@ -113,31 +97,21 @@ export function addAreas(areas) {
       .addTo(map);
 
     polygon.on('click', e => {
-      if (editorActive) return; // editor mode captures map clicks instead
+      if (editorActive) {
+        selectEditorZone(key);
+        return;
+      }
       handleAreaClick(area, e.latlng);
     });
 
     areaLayers[key] = { area, polygon, label };
   });
 
-  drawLinkSeams();
-
   // Frame the whole site on first load
   const all = Object.values(areaLayers).map(l => l.polygon.getBounds());
   if (all.length) {
     map.fitBounds(all.reduce((acc, b) => acc.extend(b), all[0]), { padding: [30, 30] });
   }
-}
-
-// Linked zones share a border; that shared seam is drawn as a "gate"
-// so linked borders read differently from ordinary zone edges.
-// Unlinked neighbours are pulled apart in the data itself, so a gap of
-// grey hatching says "not connected".
-function drawLinkSeams() {
-  linkSeams.forEach(({ seam }) => {
-    L.polyline(seam, { color: 'white',   weight: 7, opacity: 0.9, lineCap: 'round', interactive: false }).addTo(map);
-    L.polyline(seam, { color: '#111827', weight: 2.5, opacity: 0.75, dashArray: '4,6', lineCap: 'butt', interactive: false }).addTo(map);
-  });
 }
 
 // ── TEAM-COLOUR HATCH PATTERNS ────────────────────────────────────
@@ -180,7 +154,6 @@ function styleFor(owner, locked) {
 // Firebase update so all phones recolour live. Claimed-but-unlocked
 // zones show hatched (stealable); locked zones are solid.
 export function updateAreaLayers(gs) {
-  const myTeam = getMyTeam();
   ensureHatchPatterns();
   Object.entries(areaLayers).forEach(([key, layer]) => {
     const a = gs.areas && gs.areas[key];
@@ -190,10 +163,7 @@ export function updateAreaLayers(gs) {
       // setStyle just wrote a solid fill attribute; swap it for the hatch
       layer.polygon._path.setAttribute('fill', 'url(#hatch-' + a.owner + ')');
     }
-    const unknown = myTeam !== null && !isVisited(gs, myTeam, key);
-    layer.label.setContent(
-      (a.locked ? '🔒 ' : '') + (unknown ? '❓ ' : '') + esc(layer.area.name)
-    );
+    layer.label.setContent((a.locked ? '🔒 ' : '') + esc(layer.area.name));
   });
 }
 
@@ -206,14 +176,18 @@ function handleAreaClick(area, latlng) {
   if (!a) return;
 
   const myTeam   = getMyTeam();
-  const isAdmin  = myTeam === null;
+  const admin    = isAdminMode();
   const expected = { owner: a.owner, locked: !!a.locked };
 
   const isUnclaimed = a.owner === 0;
   const isMine      = myTeam !== null && a.owner === myTeam;
   const iFailed     = myTeam !== null && (a.failedBy || []).includes(myTeam);
-  // Admins see everything; teams only what they've scouted
-  const revealed    = isAdmin || isVisited(gs, myTeam, key);
+  const attempt     = myTeam !== null ? getAttempt(gs, myTeam, key) : null;
+  // Challenge text is revealed only once a team STARTS an attempt (or
+  // if you're the owner — you passed it — or a password admin)
+  const revealed    = admin || isMine || hasStarted(gs, myTeam, key);
+  // The admin can override the CSV pass mark mid-game
+  const passMark    = a.passMark || area.passMark;
 
   const statusText = a.locked
     ? '🔒 Locked by ' + esc(teamName(gs, a.owner)) + ' — cannot be taken'
@@ -224,18 +198,7 @@ function handleAreaClick(area, latlng) {
   let body = '';
   let actionsHTML = '';
 
-  if (!revealed) {
-    body =
-      '<div style="font-size:12px;color:#6b7280;margin-top:8px;line-height:1.5;">' +
-        '❓ Your team hasn\'t scouted this area yet — the challenge is revealed ' +
-        'automatically when you walk into it.' +
-      '</div>';
-    if (myTeam !== null) {
-      actionsHTML =
-        '<button id="scout-btn" class="btn btn-amber btn-full" style="margin-top:10px;">' +
-        '📍 We\'re Here — Reveal Challenge</button>';
-    }
-  } else {
+  if (revealed) {
     body =
       '<div style="margin-top:8px;">' +
         '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;' +
@@ -243,14 +206,12 @@ function handleAreaClick(area, latlng) {
         '<div style="font-size:12px;color:#374151;margin-top:4px;line-height:1.5;">' +
           esc(area.challenge || 'No challenge set') + '</div>' +
       '</div>';
-
-    if (area.passMark) {
+    if (passMark) {
       body +=
         '<div style="font-size:12px;color:#374151;margin-top:6px;">' +
-          '<span style="font-weight:700;">🎯 Pass mark:</span> ' + esc(area.passMark) +
+          '<span style="font-weight:700;">🎯 Pass mark:</span> ' + esc(passMark) +
         '</div>';
     }
-
     if (!isUnclaimed) {
       body +=
         '<div style="font-size:12px;color:#374151;margin-top:6px;">' +
@@ -259,31 +220,66 @@ function handleAreaClick(area, latlng) {
           ' <span style="color:#9ca3af;">(' + esc(teamName(gs, a.owner)) + ')</span>' +
         '</div>';
     }
+  } else {
+    body =
+      '<div style="font-size:12px;color:#6b7280;margin-top:8px;line-height:1.5;">' +
+        '❓ The challenge here is secret until your team starts an attempt.' +
+      '</div>';
+  }
 
-    const failedNote = (a.failedBy || []).length > 0
-      ? '<div style="font-size:11px;color:#9ca3af;margin-top:6px;">Locked out (failed): ' +
-        (a.failedBy || []).map(t => esc(teamName(gs, t))).join(', ') + '</div>'
-      : '';
-    body += failedNote;
+  if ((a.failedBy || []).length > 0) {
+    body += '<div style="font-size:11px;color:#9ca3af;margin-top:6px;">Locked out (failed): ' +
+      (a.failedBy || []).map(t => esc(teamName(gs, t))).join(', ') + '</div>';
+  }
 
-    if (a.locked) {
-      body += '<div style="font-size:12px;color:#6b7280;margin-top:8px;">' +
-        'This area was stolen and is locked in for the rest of the game.</div>';
-    } else if (isMine) {
-      body += '<div style="font-size:12px;color:#6b7280;margin-top:8px;">' +
-        'Your area — another team can steal it (and lock it) by beating your result.</div>';
-    } else if (iFailed) {
-      body += '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
-        '❌ Your team failed this challenge — you can\'t attempt it again until another team passes it.</div>';
-    } else if (myTeam !== null) {
-      const verb  = isUnclaimed ? '⛺ We Passed — Claim!' : '😈 We Beat It — Steal &amp; Lock!';
-      actionsHTML =
-        '<button id="claim-btn" class="btn btn-full" style="margin-top:10px;background:' +
-        states[myTeam].color + ';">' + verb + '</button>' +
-        '<button id="fail-btn" class="btn btn-neutral btn-full" style="margin-top:6px;">❌ We Failed</button>';
-    } else if (isUnclaimed) {
-      body += '<div style="font-size:12px;color:#9ca3af;margin-top:8px;">Join a team in Settings to claim areas.</div>';
+  if (a.locked) {
+    body += '<div style="font-size:12px;color:#6b7280;margin-top:8px;">' +
+      'This area was stolen and is locked in for the rest of the game.</div>';
+  } else if (isMine) {
+    body += '<div style="font-size:12px;color:#6b7280;margin-top:8px;">' +
+      'Your area — another team can steal it (and lock it) by beating your result.</div>';
+  } else if (myTeam === null) {
+    if (!admin) {
+      body += '<div style="font-size:12px;color:#9ca3af;margin-top:8px;">Join a team in Settings to play.</div>';
     }
+  } else if (iFailed) {
+    body += '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
+      '❌ Your team failed this challenge — you can\'t attempt it again until another team passes it.</div>';
+  } else if (!attempt) {
+    // Not started yet — starting reveals the challenge and commits the team
+    const timerNote = area.timer
+      ? (area.timer.mode === 'down'
+        ? '⏱️ This challenge has a ' + area.timer.minutes + '-minute countdown.'
+        : '⏱️ This challenge is against the clock (counts up).')
+      : '';
+    body += timerNote
+      ? '<div style="font-size:12px;color:#374151;font-weight:600;margin-top:8px;">' + timerNote + '</div>'
+      : '';
+    actionsHTML =
+      '<button id="start-btn" class="btn btn-full" style="margin-top:10px;background:' +
+      states[myTeam].color + ';">▶️ Start Challenge Attempt</button>' +
+      '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center;">' +
+        'Starting reveals the challenge and commits your team to a pass or a fail.' +
+      '</div>';
+  } else {
+    // Attempt in progress — show the timer (if any) and resolve buttons
+    if (area.timer) {
+      const timerLabel = area.timer.mode === 'down'
+        ? area.timer.minutes + '-minute countdown'
+        : 'time elapsed';
+      body +=
+        '<div style="margin-top:10px;text-align:center;background:#111827;color:white;' +
+          'border-radius:10px;padding:8px;">' +
+          '<div style="font-size:10px;opacity:0.7;text-transform:uppercase;letter-spacing:0.05em;">' +
+            timerLabel + '</div>' +
+          '<div id="attempt-timer" style="font-size:22px;font-weight:800;">—</div>' +
+        '</div>';
+    }
+    const verb = isUnclaimed ? '⛺ We Passed — Claim!' : '😈 We Beat It — Steal &amp; Lock!';
+    actionsHTML =
+      '<button id="claim-btn" class="btn btn-full" style="margin-top:10px;background:' +
+      states[myTeam].color + ';">' + verb + '</button>' +
+      '<button id="fail-btn" class="btn btn-neutral btn-full" style="margin-top:6px;">❌ We Failed</button>';
   }
 
   const content = document.createElement('div');
@@ -301,28 +297,57 @@ function handleAreaClick(area, latlng) {
     el.style.display = 'block';
   }
 
-  const scoutBtn = content.querySelector('#scout-btn');
-  if (scoutBtn) scoutBtn.addEventListener('click', async () => {
+  // Live ticker for the attempt timer
+  const timerEl = content.querySelector('#attempt-timer');
+  if (timerEl && attempt && area.timer) {
+    const tick = () => {
+      if (!timerEl.isConnected) { clearInterval(intv); return; }
+      const elapsed = Date.now() - attempt.startedAt;
+      if (area.timer.mode === 'down') {
+        const remaining = area.timer.minutes * 60000 - elapsed;
+        timerEl.textContent = remaining <= 0 ? "⏰ TIME'S UP" : formatCountdown(remaining);
+        if (remaining <= 0) timerEl.style.color = '#f87171';
+      } else {
+        timerEl.textContent = formatCountdown(elapsed);
+      }
+    };
+    const intv = setInterval(tick, 500);
+    tick();
+  }
+
+  const startBtn = content.querySelector('#start-btn');
+  if (startBtn) startBtn.addEventListener('click', async () => {
     const ok = window.confirm(
-      '📍 Reveal the challenge at ' + area.name + '?\n\n' +
-      'Honour system: only do this if your team is genuinely AT this area.\n' +
-      '(It normally reveals itself via GPS when you walk in.)'
+      '▶️ Start the challenge at ' + area.name + '?\n\n' +
+      'Only start when your team is AT this area and ready.\n' +
+      'The challenge is revealed, any timer starts immediately, and your ' +
+      'team must then record either a pass or a fail.'
     );
     if (!ok) return;
-    await scoutArea(key, myTeam, false);
+    const res = await startAttempt(key, myTeam, expected);
+    if (!res.ok) { showError(res.reason || ''); return; }
     map.closePopup();
+    // Reopen straight away, now showing the challenge and timer
+    setTimeout(() => handleAreaClick(area, latlng), 150);
   });
 
   const claimBtn = content.querySelector('#claim-btn');
   if (claimBtn) claimBtn.addEventListener('click', async () => {
     const confirmMsg = isUnclaimed
-      ? '⛺ Claim ' + area.name + '?\n\nOnly press this once your team has genuinely completed the challenge!'
+      ? '⛺ Claim ' + area.name + '?\n\nOnly press this if your team genuinely reached the pass mark' +
+        (passMark ? ' (' + passMark + ')' : '') + '!'
       : '😈 Steal ' + area.name + '?\n\nOnly press this if your team genuinely BEAT the result "' +
         (a.result || '—') + '".\nStolen areas lock permanently!';
     if (!window.confirm(confirmMsg)) return;
 
+    // For count-up challenges the elapsed time IS the natural result
+    let suggested = '';
+    if (area.timer && area.timer.mode === 'up' && attempt) {
+      suggested = formatCountdown(Date.now() - attempt.startedAt);
+    }
     const result = window.prompt(
-      '🎯 What result did your team get?\n(e.g. "14 catches", "38 seconds" — this is what others must beat)'
+      '🏅 What result did your team get?\n(e.g. "14 catches", "3:38" — this is what others must beat)',
+      suggested
     );
     if (result === null) return;
     const trimmed = result.trim().slice(0, 60);
@@ -345,12 +370,12 @@ function handleAreaClick(area, latlng) {
     map.closePopup();
   });
 
-  // ── Admin: reset area ──────────────────────────────────────────
-  if (isAdmin) {
+  // ── Admin: full control over the area ──────────────────────────
+  if (admin) {
     const adminDiv = document.createElement('div');
     adminDiv.innerHTML =
       '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #eee;">' +
-        '<div style="font-size:11px;font-weight:700;color:#f59e0b;margin-bottom:6px;">⚙️ Admin: Reset Area</div>' +
+        '<div style="font-size:11px;font-weight:700;color:#f59e0b;margin-bottom:6px;">⚙️ Admin: Set Area</div>' +
         '<select id="admin-owner-select" style="width:100%;margin-bottom:6px;">' +
           [0, 1, 2, 3].map(i =>
             '<option value="' + i + '"' + (i === a.owner ? ' selected' : '') + '>' +
@@ -358,18 +383,29 @@ function handleAreaClick(area, latlng) {
           ).join('') +
         '</select>' +
         '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;' +
-          'text-transform:none;letter-spacing:0;font-weight:600;margin:0 0 8px;">' +
+          'text-transform:none;letter-spacing:0;font-weight:600;margin:0 0 6px;">' +
           '<input type="checkbox" id="admin-locked-check"' + (a.locked ? ' checked' : '') + ' ' +
             'style="width:auto;margin:0;" /> Locked' +
         '</label>' +
-        '<button id="admin-reset-btn" class="btn btn-amber btn-full btn-sm">🔄 Apply</button>' +
+        '<input type="text" id="admin-result-input" maxlength="60" placeholder="Result to beat" ' +
+          'value="' + esc(a.result || '') + '" ' +
+          'style="width:100%;padding:6px 8px;border:1px solid #e5e7eb;border-radius:8px;' +
+          'font-size:12px;font-family:inherit;outline:none;margin-bottom:6px;box-sizing:border-box;" />' +
+        '<input type="text" id="admin-passmark-input" maxlength="60" placeholder="Pass mark" ' +
+          'value="' + esc(passMark || '') + '" ' +
+          'style="width:100%;padding:6px 8px;border:1px solid #e5e7eb;border-radius:8px;' +
+          'font-size:12px;font-family:inherit;outline:none;margin-bottom:8px;box-sizing:border-box;" />' +
+        '<button id="admin-apply-btn" class="btn btn-amber btn-full btn-sm">🔄 Apply</button>' +
       '</div>';
     content.appendChild(adminDiv);
 
-    adminDiv.querySelector('#admin-reset-btn').addEventListener('click', async () => {
-      const owner  = parseInt(adminDiv.querySelector('#admin-owner-select').value);
-      const locked = adminDiv.querySelector('#admin-locked-check').checked;
-      await adminResetArea(key, owner, locked);
+    adminDiv.querySelector('#admin-apply-btn').addEventListener('click', async () => {
+      await adminSetArea(key, {
+        owner:    parseInt(adminDiv.querySelector('#admin-owner-select').value),
+        locked:   adminDiv.querySelector('#admin-locked-check').checked,
+        result:   adminDiv.querySelector('#admin-result-input').value.trim().slice(0, 60),
+        passMark: adminDiv.querySelector('#admin-passmark-input').value.trim().slice(0, 60),
+      });
       map.closePopup();
     });
   }
@@ -381,12 +417,11 @@ function handleAreaClick(area, latlng) {
 }
 
 // ── AREA EDITOR (admin tool) ──────────────────────────────────────
-// Trace a new area by tapping its corners on the map; the finished
-// polygon is output as a snippet ready to paste into areas.js
+// Adjust an existing zone: tap it, drag its corner handles, then copy
+// the updated snippet into areas.js. No new zones are created.
 let editorActive  = false;
-let editorPoints  = [];
-let editorMarkers = [];
-let editorLine    = null;
+let editorKey     = null;
+let editorHandles = [];
 let editorControl = null;
 
 export function isEditorActive() {
@@ -404,74 +439,71 @@ function startEditor() {
   editorControl = document.createElement('div');
   editorControl.id = 'editor-control';
   editorControl.innerHTML =
-    '<div style="font-size:12px;font-weight:700;margin-bottom:6px;">✏️ Tap the map to trace an area</div>' +
-    '<div style="display:flex;gap:6px;">' +
-      '<button id="editor-undo" class="btn btn-ghost btn-sm">↩ Undo</button>' +
-      '<button id="editor-finish" class="btn btn-success btn-sm">✅ Finish Area</button>' +
+    '<div id="editor-hint" style="font-size:12px;font-weight:700;margin-bottom:6px;">✏️ Tap a zone to edit its corners</div>' +
+    '<div style="display:flex;gap:6px;justify-content:center;">' +
+      '<button id="editor-copy" class="btn btn-success btn-sm" disabled>📋 Copy Snippet</button>' +
     '</div>';
   document.getElementById('screen-map').appendChild(editorControl);
 
-  editorControl.querySelector('#editor-undo').addEventListener('click', () => {
-    editorPoints.pop();
-    const m = editorMarkers.pop();
-    if (m) map.removeLayer(m);
-    redrawEditorLine();
-  });
-
-  editorControl.querySelector('#editor-finish').addEventListener('click', finishEditorArea);
+  editorControl.querySelector('#editor-copy').addEventListener('click', copyEditorSnippet);
 }
 
 function stopEditor() {
-  clearEditorDrawing();
+  clearEditorHandles();
+  editorKey = null;
   if (editorControl) {
     editorControl.remove();
     editorControl = null;
   }
 }
 
-function clearEditorDrawing() {
-  editorPoints = [];
-  editorMarkers.forEach(m => map.removeLayer(m));
-  editorMarkers = [];
-  if (editorLine) {
-    map.removeLayer(editorLine);
-    editorLine = null;
-  }
+function clearEditorHandles() {
+  editorHandles.forEach(h => map.removeLayer(h));
+  editorHandles = [];
 }
 
-function handleEditorClick(e) {
-  if (!editorActive) return;
-  editorPoints.push([
-    parseFloat(e.latlng.lat.toFixed(6)),
-    parseFloat(e.latlng.lng.toFixed(6)),
-  ]);
-  const m = L.circleMarker(e.latlng, {
-    radius: 5, color: 'white', fillColor: '#f59e0b', fillOpacity: 1, weight: 2
-  }).addTo(map);
-  editorMarkers.push(m);
-  redrawEditorLine();
+const handleIcon = L.divIcon({
+  className: '',
+  html: '<div style="width:16px;height:16px;background:white;border:3px solid #f59e0b;' +
+        'border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>',
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
+});
+
+function selectEditorZone(key) {
+  const layer = areaLayers[key];
+  if (!layer) return;
+  clearEditorHandles();
+  editorKey = key;
+
+  const hint = editorControl && editorControl.querySelector('#editor-hint');
+  if (hint) hint.textContent = '✏️ ' + layer.area.name + ' — drag the handles, then Copy';
+  const copyBtn = editorControl && editorControl.querySelector('#editor-copy');
+  if (copyBtn) copyBtn.disabled = false;
+
+  const ring = layer.polygon.getLatLngs()[0];
+  ring.forEach((latlng, i) => {
+    const handle = L.marker(latlng, { icon: handleIcon, draggable: true, zIndexOffset: 2000 }).addTo(map);
+    handle.on('drag', () => {
+      ring[i] = handle.getLatLng();
+      layer.polygon.setLatLngs([ring]);
+    });
+    handle.on('dragend', () => {
+      layer.label.setLatLng(layer.polygon.getBounds().getCenter());
+    });
+    editorHandles.push(handle);
+  });
 }
 
-function redrawEditorLine() {
-  if (editorLine) map.removeLayer(editorLine);
-  editorLine = editorPoints.length > 1
-    ? L.polyline(editorPoints, { color: '#f59e0b', weight: 3, dashArray: '6,6' }).addTo(map)
-    : null;
-}
-
-function finishEditorArea() {
-  if (editorPoints.length < 3) {
-    window.alert('Tap at least 3 corners first.');
-    return;
-  }
-  const name = window.prompt('Name for this area?');
-  if (!name) return;
-
+function copyEditorSnippet() {
+  if (!editorKey) return;
+  const layer = areaLayers[editorKey];
+  const ring  = layer.polygon.getLatLngs()[0];
   const snippet =
     '  {\n' +
-    '    name: "' + name.replace(/"/g, '\\"') + '",\n' +
+    '    name: "' + layer.area.name.replace(/"/g, '\\"') + '",\n' +
     '    polygon: [\n' +
-    editorPoints.map(p => '      [' + p[0] + ', ' + p[1] + '],').join('\n') + '\n' +
+    ring.map(p => '      [' + p.lat.toFixed(6) + ', ' + p.lng.toFixed(6) + '],').join('\n') + '\n' +
     '    ],\n' +
     '  },\n';
 
@@ -481,10 +513,8 @@ function finishEditorArea() {
     out.parentElement.style.display = 'block';
   }
   if (navigator.clipboard) navigator.clipboard.writeText(snippet).catch(() => {});
-  console.log('✏️ New area snippet:\n' + snippet);
-  window.alert('✅ "' + name + '" captured!\n\nThe snippet was added to the box in Settings (and copied to the clipboard). Paste it into areas.js.');
-
-  clearEditorDrawing();
+  console.log('✏️ Updated area snippet:\n' + snippet);
+  window.alert('✅ Updated "' + layer.area.name + '" copied!\n\nPaste it over that area\'s entry in areas.js (also in the box in Settings). The change is only on this device until areas.js is updated.');
 }
 
 // ── PLAYER LOCATION SHARING ───────────────────────────────────────

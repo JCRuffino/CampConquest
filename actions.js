@@ -120,48 +120,71 @@ export async function failChallenge(key, team, expected) {
   pushLog({
     timestamp: Date.now(),
     team,
-    type: 'claim',
+    type: 'attempt',
     message: '❌ ' + teamName(gs, team) + ' failed the challenge at ' + name +
              ' — locked out until another team passes it',
   });
   return { ok: true };
 }
 
-// Mark an area as visited by a team, revealing its challenge to them.
-// Fired automatically when a player's GPS enters the area, or manually
-// (honour system) from the popup.
-export async function scoutArea(key, team, auto) {
+// Start a challenge attempt: reveals the challenge text to the team
+// (permanently) and starts any timer. Starting commits the team to
+// recording a pass or a fail.
+export async function startAttempt(key, team, expected) {
+  if (gameOverGuard(gameState.data)) return { ok: false };
+
+  let failReason = '';
+
   const committed = await mutateState(gs => {
-    if (!gs.visited) gs.visited = {};
-    if (!gs.visited[team]) gs.visited[team] = {};
-    if (gs.visited[team][key]) return; // already scouted
-    gs.visited[team][key] = true;
+    const a = gs.areas && gs.areas[key];
+    if (!a) return;
+    if (a.owner !== expected.owner || !!a.locked !== !!expected.locked) {
+      failReason = 'This area just changed — reopen it to see the latest state.';
+      return;
+    }
+    if (a.locked) {
+      failReason = 'This area is locked.';
+      return;
+    }
+    if (a.owner === team) {
+      failReason = 'Your team already controls this area.';
+      return;
+    }
+    if ((a.failedBy || []).includes(team)) {
+      failReason = 'Your team failed this challenge — you can\'t attempt it again until another team passes it.';
+      return;
+    }
+    if (!gs.attempts) gs.attempts = {};
+    if (!gs.attempts[team]) gs.attempts[team] = {};
+    gs.attempts[team][key] = { startedAt: Date.now() };
     return gs;
   });
 
-  if (!committed) return { ok: false };
+  if (!committed) return { ok: false, reason: failReason || 'Could not start — please try again.' };
 
   const gs = gameState.data;
   const name = (gs.areas[key] && gs.areas[key].displayName) || key;
   pushLog({
     timestamp: Date.now(),
     team,
-    type: 'scout',
-    message: '🔍 ' + teamName(gs, team) + ' scouted ' + name +
-             (auto ? '' : ' (manual reveal)'),
+    type: 'attempt',
+    message: '▶️ ' + teamName(gs, team) + ' started the challenge at ' + name,
   });
   return { ok: true };
 }
 
-// Admin: set an area to any state
-export async function adminResetArea(key, owner, locked) {
+// Admin: set an area to any state — ownership, lock, the current result
+// to beat, and a pass-mark override (replaces the challenges.csv value)
+export async function adminSetArea(key, fields) {
   const committed = await mutateState(gs => {
     const a = gs.areas && gs.areas[key];
     if (!a) return;
-    a.owner    = owner;
-    a.locked   = owner === 0 ? false : !!locked;
-    a.failedBy = [];
-    if (owner === 0) a.result = '';
+    const clearFails = a.owner !== fields.owner; // ownership change reopens the area
+    a.owner    = fields.owner;
+    a.locked   = fields.owner === 0 ? false : !!fields.locked;
+    a.result   = fields.owner === 0 ? '' : (fields.result || '');
+    a.passMark = fields.passMark || '';
+    if (clearFails) a.failedBy = [];
     return gs;
   });
 
@@ -173,8 +196,8 @@ export async function adminResetArea(key, owner, locked) {
     timestamp: Date.now(),
     team: 0,
     type: 'claim',
-    message: '⚙️ Admin reset ' + name + ' → ' + teamName(gs, owner) +
-             (owner !== 0 && locked ? ' (locked)' : ''),
+    message: '⚙️ Admin set ' + name + ' → ' + teamName(gs, fields.owner) +
+             (fields.owner !== 0 && fields.locked ? ' (locked)' : ''),
   });
   return { ok: true };
 }

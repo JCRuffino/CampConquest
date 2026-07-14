@@ -1,6 +1,7 @@
 import { mutateState, pushLog } from './firebase.js';
 import { gameState, getMyTeam, setMyTeam, states,
-         getGameCode, setGameCode, normalizeGameCode } from './shared.js';
+         getGameCode, setGameCode, normalizeGameCode,
+         isAdminMode, setAdminMode } from './shared.js';
 import { toggleAreaEditor } from './map.js';
 
 export function initSettings(resetCallback) {
@@ -37,8 +38,7 @@ export function initSettings(resetCallback) {
       currentLabel.style.color = '#555';
     }
     refreshResetBtn();
-    refreshTimerUI();
-    refreshEditorCard();
+    refreshAdminUI();
   }
 
   assignBtns.forEach(btn => {
@@ -81,7 +81,7 @@ export function initSettings(resetCallback) {
   function refreshTimerUI() {
     const gs      = gameState.data;
     const t       = gs && gs.timer;
-    const isAdmin = getMyTeam() === null;
+    const isAdmin = isAdminMode();
     const running = t && t.endsAt && Date.now() < t.endsAt;
     const ended   = t && t.endsAt && Date.now() >= t.endsAt;
 
@@ -122,7 +122,7 @@ export function initSettings(resetCallback) {
   });
 
   function adjustTimer(deltaMs, label) {
-    if (getMyTeam() !== null) return;
+    if (!isAdminMode()) return;
     mutateState(gs => {
       if (!gs.timer || !gs.timer.endsAt) return;
       gs.timer.endsAt += deltaMs;
@@ -145,7 +145,7 @@ export function initSettings(resetCallback) {
   document.getElementById('timer-minus-btn').addEventListener('click', () => adjustTimer(-5 * 60000, '−5 minutes'));
 
   document.getElementById('timer-endnow-btn').addEventListener('click', () => {
-    if (getMyTeam() !== null) return;
+    if (!isAdminMode()) return;
     mutateState(gs => {
       if (!gs.timer || !gs.timer.endsAt || Date.now() >= gs.timer.endsAt) return;
       gs.timer.endsAt = Date.now();
@@ -154,7 +154,7 @@ export function initSettings(resetCallback) {
   });
 
   document.getElementById('timer-cancel-btn').addEventListener('click', () => {
-    if (getMyTeam() !== null) return;
+    if (!isAdminMode()) return;
     mutateState(gs => {
       if (!gs.timer) return;
       gs.timer = null;
@@ -188,84 +188,95 @@ export function initSettings(resetCallback) {
     window.location.reload();
   });
 
-  // ── Area editor (admin) ───────────────────────────────────────────
-  const editorCard = document.getElementById('editor-card');
-  const editorBtn  = document.getElementById('editor-toggle-btn');
+  // ── Admin mode ────────────────────────────────────────────────────
+  // Unlocks the area editor, game reset, timer controls, and the
+  // per-area admin panel in map popups
+  const ADMIN_PASSWORD = 'bankofcum'; // 🔑
 
-  function refreshEditorCard() {
-    if (editorCard) editorCard.style.display = getMyTeam() === null ? 'block' : 'none';
+  const adminStatus  = document.getElementById('admin-status');
+  const adminInput   = document.getElementById('admin-password-input');
+  const adminBtn     = document.getElementById('admin-unlock-btn');
+  const adminError   = document.getElementById('admin-password-error');
+  const adminRow     = document.getElementById('admin-unlock-row');
+  const editorCard   = document.getElementById('editor-card');
+  const resetCard    = document.getElementById('reset-card');
+
+  function refreshAdminUI() {
+    const on = isAdminMode();
+    if (adminStatus) {
+      adminStatus.textContent = on
+        ? '✅ Admin mode active on this device'
+        : 'Enter the admin password to unlock admin controls.';
+      adminStatus.style.color = on ? '#2a9d3f' : '#6b7280';
+    }
+    if (adminRow)    adminRow.style.display   = on ? 'none' : 'flex';
+    if (adminBtn)    adminBtn.textContent     = on ? '🔒 Lock' : 'Unlock';
+    if (editorCard)  editorCard.style.display = on ? 'block' : 'none';
+    if (resetCard)   resetCard.style.display  = on ? 'block' : 'none';
+    const lockBtn = document.getElementById('admin-lock-btn');
+    if (lockBtn) lockBtn.style.display = on ? 'inline-flex' : 'none';
+    refreshTimerUI();
   }
+
+  if (adminBtn) adminBtn.addEventListener('click', () => {
+    if (adminInput.value === ADMIN_PASSWORD) {
+      setAdminMode(true);
+      adminInput.value = '';
+      adminError.style.display = 'none';
+      refreshAdminUI();
+      if (gameState.data) {
+        import('./ui.js').then(({ renderAll }) => renderAll(gameState.data));
+      }
+    } else {
+      adminError.style.display = 'block';
+      adminInput.value = '';
+      adminInput.focus();
+    }
+  });
+
+  if (adminInput) adminInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') adminBtn.click();
+  });
+
+  const adminLockBtn = document.getElementById('admin-lock-btn');
+  if (adminLockBtn) adminLockBtn.addEventListener('click', () => {
+    setAdminMode(false);
+    refreshAdminUI();
+    if (gameState.data) {
+      import('./ui.js').then(({ renderAll }) => renderAll(gameState.data));
+    }
+  });
+
+  // ── Area editor (admin) ───────────────────────────────────────────
+  const editorBtn = document.getElementById('editor-toggle-btn');
 
   if (editorBtn) {
     editorBtn.addEventListener('click', () => {
       const active = toggleAreaEditor();
       editorBtn.textContent = active ? '🛑 Stop Editing' : '✏️ Start Area Editor';
       if (active) {
-        // Jump to the map so tracing can begin straight away
+        // Jump to the map so editing can begin straight away
         document.querySelector('.nav-btn[data-screen="map"]').click();
       }
     });
   }
 
-  // ── Reset ─────────────────────────────────────────────────────────
-  const RESET_PASSWORD = 'happycampers'; // 🔑 Change this
-
-  const resetBtn       = document.getElementById('reset-btn');
-  const blockedMsg     = document.getElementById('reset-blocked-msg');
-  const resetOverlay   = document.getElementById('reset-overlay');
-  const confirmBtn     = document.getElementById('reset-confirm-btn');
-  const cancelBtn      = document.getElementById('reset-cancel-btn');
-  const passwordInput  = document.getElementById('reset-password-input');
-  const passwordError  = document.getElementById('reset-password-error');
+  // ── Reset (admin) ─────────────────────────────────────────────────
+  const resetBtn = document.getElementById('reset-btn');
 
   function refreshResetBtn() {
-    if (getMyTeam()) {
-      resetBtn.disabled        = true;
-      resetBtn.style.opacity   = '0.4';
-      blockedMsg.style.display = 'block';
-    } else {
-      resetBtn.disabled        = false;
-      resetBtn.style.opacity   = '1';
-      blockedMsg.style.display = 'none';
-    }
-  }
-
-  function closeResetModal() {
-    resetOverlay.classList.remove('active');
-    passwordInput.value        = '';
-    passwordError.style.display = 'none';
-    passwordInput.style.borderColor = '#e5e7eb';
+    // visibility handled by refreshAdminUI via the card
   }
 
   resetBtn.addEventListener('click', () => {
-    if (getMyTeam()) return;
-    closeResetModal(); // clear any previous state
-    resetOverlay.classList.add('active');
-    setTimeout(() => passwordInput.focus(), 50);
-  });
-
-  cancelBtn.addEventListener('click', closeResetModal);
-
-  // Close on backdrop click
-  resetOverlay.addEventListener('click', (e) => {
-    if (e.target === resetOverlay) closeResetModal();
-  });
-
-  confirmBtn.addEventListener('click', () => {
-    if (passwordInput.value === RESET_PASSWORD) {
-      closeResetModal();
-      resetCallback();
-    } else {
-      passwordError.style.display     = 'block';
-      passwordInput.style.borderColor = '#e63946';
-      passwordInput.value             = '';
-      passwordInput.focus();
-    }
-  });
-
-  // Allow pressing Enter in the password field
-  passwordInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') confirmBtn.click();
+    if (!isAdminMode()) return;
+    const ok = window.confirm(
+      '⚠️ Reset the ENTIRE game?\n\n' +
+      'Every area goes back to unclaimed and the history is wiped.\n' +
+      'This cannot be undone.'
+    );
+    if (!ok) return;
+    resetCallback();
   });
 
   // ── Public API ────────────────────────────────────────────────────
