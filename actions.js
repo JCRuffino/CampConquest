@@ -49,6 +49,7 @@ export async function claimArea(key, team, expected, result) {
     a.result   = result;
     a.locked   = wasSteal; // a stolen area locks permanently
     a.failedBy = [];       // a pass clears everyone's lockouts
+    a.era      = (a.era || 0) + 1; // stale attempts no longer count as in-progress
     delete a.contestedBy;
 
     // Controlling more than half the areas wins immediately
@@ -209,7 +210,7 @@ export async function startAttempt(key, team, expected) {
     }
     if (!gs.attempts) gs.attempts = {};
     if (!gs.attempts[team]) gs.attempts[team] = {};
-    gs.attempts[team][key] = { startedAt: Date.now() };
+    gs.attempts[team][key] = { startedAt: Date.now(), era: a.era || 0 };
     return gs;
   });
 
@@ -247,6 +248,7 @@ export async function adminSetArea(key, fields) {
     a.passMark = fields.passMark || '';
     if (clearFails) {
       a.failedBy = [];
+      a.era      = (a.era || 0) + 1;
       delete a.contestedBy;
     }
 

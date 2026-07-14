@@ -85,8 +85,21 @@ export function getAttempt(gs, team, key) {
   return (gs && gs.attempts && gs.attempts[team] && gs.attempts[team][key]) || null;
 }
 
+// Once a team has started a challenge it has SEEN the text forever
 export function hasStarted(gs, team, key) {
   return !!getAttempt(gs, team, key);
+}
+
+// …but the attempt only counts as in-progress in the area's current
+// era. Every pass (claim/steal) bumps the era, so a team returning
+// after someone else passed must press Start again (fresh timer, and
+// the steal-duel registration happens properly).
+export function getCurrentAttempt(gs, team, key) {
+  const att = getAttempt(gs, team, key);
+  if (!att) return null;
+  const a = gs.areas && gs.areas[key];
+  if (!a) return null;
+  return (att.era || 0) === (a.era || 0) ? att : null;
 }
 
 // Ray-casting point-in-polygon; polygon is [[lat, lng], …]

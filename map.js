@@ -1,6 +1,6 @@
 import { pushPlayerLocation, removePlayerLocation, listenToPlayerLocations } from './firebase.js';
 import { states, gameState, toKey, getMyTeam, esc, teamName,
-         hasStarted, getAttempt, isAdminMode, formatCountdown } from './shared.js';
+         hasStarted, getCurrentAttempt, isAdminMode, formatCountdown } from './shared.js';
 import { claimArea, failChallenge, startAttempt, adminSetArea } from './actions.js';
 import { siteBoundary } from './areas.js';
 
@@ -192,7 +192,7 @@ function handleAreaClick(area, latlng) {
   const isUnclaimed = a.owner === 0;
   const isMine      = myTeam !== null && a.owner === myTeam;
   const iFailed     = myTeam !== null && (a.failedBy || []).includes(myTeam);
-  const attempt     = myTeam !== null ? getAttempt(gs, myTeam, key) : null;
+  const attempt     = myTeam !== null ? getCurrentAttempt(gs, myTeam, key) : null;
   // Challenge text is revealed only once a team STARTS an attempt (or
   // if you're the owner — you passed it — or a password admin)
   const revealed    = admin || isMine || hasStarted(gs, myTeam, key);
