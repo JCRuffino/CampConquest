@@ -259,7 +259,7 @@ function handleAreaClick(area, latlng) {
     }
   } else if (iFailed) {
     body += '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
-      '❌ Your team failed this challenge — you can\'t attempt it again until another team passes it.</div>';
+      '❌ Your team failed this challenge — this area is off-limits to you for the rest of the game.</div>';
   } else if (a.contestedBy && a.contestedBy !== myTeam) {
     body += '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
       '🚫 Too late — ' + esc(teamName(gs, a.contestedBy)) + ' got here first. Only one team can contest a claimed area.</div>';
@@ -376,7 +376,7 @@ function handleAreaClick(area, latlng) {
     const ok = window.confirm(
       '❌ Record a FAILED attempt at ' + area.name + '?\n\n' +
       (isUnclaimed
-        ? 'Your team won\'t be able to attempt this challenge again until another team passes it.'
+        ? 'Your team will NEVER be able to attempt this area again.'
         : 'The steal has failed — the area LOCKS permanently for ' + teamName(gs, a.owner) + '!')
     );
     if (!ok) return;

@@ -39,7 +39,7 @@ export async function claimArea(key, team, expected, result) {
       return;
     }
     if ((a.failedBy || []).includes(team)) {
-      failReason = 'Your team failed this challenge — you can\'t attempt it again until another team passes it.';
+      failReason = 'Your team failed this challenge — you can\'t attempt this area again.';
       return;
     }
     wasSteal   = a.owner !== 0;
@@ -48,7 +48,8 @@ export async function claimArea(key, team, expected, result) {
     a.owner    = team;
     a.result   = result;
     a.locked   = wasSteal; // a stolen area locks permanently
-    a.failedBy = [];       // a pass clears everyone's lockouts
+    // failedBy is NOT cleared — failing an area bars that team from it
+    // for the rest of the game
     a.era      = (a.era || 0) + 1; // stale attempts no longer count as in-progress
     delete a.contestedBy;
 
@@ -109,8 +110,8 @@ export async function claimArea(key, team, expected, result) {
 }
 
 // Record a failed challenge attempt.
-// On an UNCLAIMED area: the team is locked out until another team
-// passes the challenge (claim/steal clears failedBy).
+// On an UNCLAIMED area: the team is barred from this area for the rest
+// of the game.
 // On a CLAIMED area (a steal attempt): the duel is over — the area
 // LOCKS for the original owner.
 export async function failChallenge(key, team, expected) {
@@ -165,7 +166,7 @@ export async function failChallenge(key, team, expected) {
       team,
       type: 'attempt',
       message: '❌ ' + teamName(gs, team) + ' failed the challenge at ' + name +
-               ' — locked out until another team passes it',
+               ' — they can\'t attempt this area again',
     });
   }
   return { ok: true };
@@ -195,7 +196,7 @@ export async function startAttempt(key, team, expected) {
       return;
     }
     if ((a.failedBy || []).includes(team)) {
-      failReason = 'Your team failed this challenge — you can\'t attempt it again until another team passes it.';
+      failReason = 'Your team failed this challenge — you can\'t attempt this area again.';
       return;
     }
     // A claimed area can only be contested by ONE rival team: the first
