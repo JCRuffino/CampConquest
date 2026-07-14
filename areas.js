@@ -42,19 +42,28 @@ export const siteBoundary = [
 // A zone can be in several lines. Order matters (consecutive = adjacent
 // entries). Lines shorter than 4 zones can never win by themselves but
 // still show as connections.
+// Adjacency between zones confirmed by Joseph 2026-07-14; the grouping
+// of connections into straight lines is the design decision.
 export const winLines = [
-  // Confirmed:
-  ["Chestnut", "Oaks 4", "Birches 3", "Willows 5", "Willows 4", "Meadow"],
+  // North row (west → east)
+  ["Main Campfire", "Chapel", "Social Deduction Glade", "Village Square", "Arena", "Beeches"],
+  // Middle row (west → east)
+  ["Meadow", "RPG Glade", "Willows 1", "Birches 1", "Birches 2", "Oaks 2"],
+  // Oaks row (south-west → north-east)
   ["Oaks 4", "Oaks 3", "Oaks 2", "Oaks 1"],
-  // Proposed — awaiting confirmation:
-  ["Main Campfire", "Chapel", "Social Deduction Glade", "Village Square", "Arena"],
-  ["Main Campfire", "Meadow", "Willows 4", "Willows 2"],
-  ["Meadow", "RPG Glade", "Willows 1", "Birches 1", "Birches 2", "Oaks 1"],
-  ["Arena", "Beeches", "Oaks 1", "Oaks 2"],
-  ["Village Square", "Birches 1", "Birches 3", "Willows 2"],
-  ["Willows 2", "Birches 3", "Birches 2", "Beeches"],
+  // West column (north → south)
+  ["Village Square", "Willows 1", "Willows 5", "Willows 2"],
+  // Long column (south → north): Chestnut up the middle-west
+  ["Chestnut", "Oaks 4", "Birches 3", "Willows 5", "Willows 4", "Meadow"],
+  // Central diagonal (north → south)
+  ["Village Square", "Birches 1", "Birches 3", "Oaks 4", "Chestnut"],
+  // East diagonal (north-west → south-east)
+  ["Village Square", "Arena", "Beeches", "Oaks 1"],
+  // Connection-only lines (under 4 zones — can't win by themselves)
+  ["Chapel", "RPG Glade", "Willows 4"],
+  ["Beeches", "Birches 2", "Birches 3"],
   ["Willows 5", "Birches 3", "Oaks 3"],
-  ["Willows 1", "Willows 5", "Willows 2"],
+  ["Main Campfire", "Meadow"],
 ];
 
 export const areaDefinitions = [
