@@ -6,8 +6,7 @@
 // silently overwriting.
 
 import { mutateState, pushLog } from './firebase.js';
-import { gameState, teamName, gameOverGuard, findWinningLine, findAnyWinner,
-         WIN_LENGTH } from './shared.js';
+import { gameState, teamName, gameOverGuard, largestCluster } from './shared.js';
 
 // Complete the challenge → claim an unclaimed area, recording the result
 // other teams will have to beat. Stealing (owner !== 0) locks the area.
@@ -18,15 +17,10 @@ export async function claimArea(key, team, expected, result) {
   let wasSteal   = false;
   let prevOwner  = 0;
   let prevResult = '';
-  let winningLine = null;
 
   const committed = await mutateState(gs => {
     const a = gs.areas && gs.areas[key];
     if (!a) return;
-    if (gs.winner) {
-      failReason = 'The game is already won!';
-      return;
-    }
     if (a.owner !== expected.owner || !!a.locked !== !!expected.locked) {
       failReason = 'This area just changed — reopen it to see the latest state.';
       return;
@@ -45,9 +39,6 @@ export async function claimArea(key, team, expected, result) {
     a.owner    = team;
     a.result   = result;
     a.locked   = wasSteal; // a stolen area locks permanently
-
-    winningLine = findWinningLine(gs, team);
-    if (winningLine) gs.winner = { team, line: winningLine, at: Date.now() };
     return gs;
   });
 
@@ -73,14 +64,17 @@ export async function claimArea(key, team, expected, result) {
       message: '⛺ ' + teamName(gs, team) + ' claimed ' + name + ' with a result of "' + result + '"',
     });
   }
-  if (winningLine) {
+  // A claim/steal that grows a team's biggest connected group is worth
+  // shouting about
+  const cluster = largestCluster(gs, team);
+  if (cluster >= 3) {
     pushLog({
       timestamp: Date.now(),
       team,
-      type: 'timer',
+      type: 'claim',
       big:  true,
-      message: '🏆 ' + teamName(gs, team) + ' got ' + WIN_LENGTH + ' areas in a row — ' +
-               'THEY WIN THE GAME!',
+      message: '🔗 ' + teamName(gs, team) + '\'s largest connected group is now ' +
+               cluster + ' zones!',
     });
   }
   return { ok: true };
@@ -112,24 +106,14 @@ export async function scoutArea(key, team, auto) {
   return { ok: true };
 }
 
-// Admin: set an area to any state (also recomputes the winner, so a
-// mistaken claim that "won" the game can be undone)
+// Admin: set an area to any state
 export async function adminResetArea(key, owner, locked) {
-  let winnerChange = null;
-
   const committed = await mutateState(gs => {
     const a = gs.areas && gs.areas[key];
     if (!a) return;
     a.owner  = owner;
     a.locked = owner === 0 ? false : !!locked;
     if (owner === 0) a.result = '';
-
-    const hadWinner = gs.winner ? gs.winner.team : null;
-    const now       = findAnyWinner(gs);
-    if (now) gs.winner = { team: now.team, line: now.line, at: (gs.winner && gs.winner.at) || Date.now() };
-    else if (gs.winner) delete gs.winner;
-    const hasWinner = now ? now.team : null;
-    if (hadWinner !== hasWinner) winnerChange = { from: hadWinner, to: hasWinner };
     return gs;
   });
 
@@ -144,16 +128,5 @@ export async function adminResetArea(key, owner, locked) {
     message: '⚙️ Admin reset ' + name + ' → ' + teamName(gs, owner) +
              (owner !== 0 && locked ? ' (locked)' : ''),
   });
-  if (winnerChange) {
-    pushLog({
-      timestamp: Date.now(),
-      team: 0,
-      type: 'timer',
-      big:  true,
-      message: winnerChange.to
-        ? '🏆 After the admin correction, ' + teamName(gs, winnerChange.to) + ' has ' + WIN_LENGTH + ' in a row and WINS!'
-        : '⚙️ Admin correction: the previous win no longer stands — the game is back on!',
-    });
-  }
   return { ok: true };
 }

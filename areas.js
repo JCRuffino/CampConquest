@@ -36,34 +36,42 @@ export const siteBoundary = [
   [50.860333, 0.236195],
 ];
 
-// ── WIN LINES ─────────────────────────────────────────────────────
-// The game is won by owning 4 CONSECUTIVE zones within one of these
-// lines. Lines are drawn on the map so players can see what connects.
-// A zone can be in several lines. Order matters (consecutive = adjacent
-// entries). Lines shorter than 4 zones can never win by themselves but
-// still show as connections.
-// Adjacency between zones confirmed by Joseph 2026-07-14; the grouping
-// of connections into straight lines is the design decision.
-export const winLines = [
-  // North row (west → east)
-  ["Main Campfire", "Chapel", "Social Deduction Glade", "Village Square", "Arena", "Beeches"],
-  // Middle row (west → east)
-  ["Meadow", "RPG Glade", "Willows 1", "Birches 1", "Birches 2", "Oaks 2"],
-  // Oaks row (south-west → north-east)
-  ["Oaks 4", "Oaks 3", "Oaks 2", "Oaks 1"],
-  // West column (north → south)
-  ["Village Square", "Willows 1", "Willows 5", "Willows 2"],
-  // Long column (south → north): Chestnut up the middle-west
-  ["Chestnut", "Oaks 4", "Birches 3", "Willows 5", "Willows 4", "Meadow"],
-  // Central diagonal (north → south)
-  ["Village Square", "Birches 1", "Birches 3", "Oaks 4", "Chestnut"],
-  // East diagonal (north-west → south-east)
-  ["Village Square", "Arena", "Beeches", "Oaks 1"],
-  // Connection-only lines (under 4 zones — can't win by themselves)
-  ["Chapel", "RPG Glade", "Willows 4"],
-  ["Beeches", "Birches 2", "Birches 3"],
-  ["Willows 5", "Birches 3", "Oaks 3"],
+// ── CONNECTIONS ───────────────────────────────────────────────────
+// Which zones count as "next to" each other, drawn as dotted links on
+// the map. Scoring is Stateside Scramble style: a team's score is the
+// size of its largest group of connected zones. Every pair below was
+// confirmed by Joseph on 2026-07-14.
+export const connections = [
+  ["Main Campfire", "Chapel"],
   ["Main Campfire", "Meadow"],
+  ["Chapel", "Social Deduction Glade"],
+  ["Chapel", "RPG Glade"],
+  ["Social Deduction Glade", "Village Square"],
+  ["Village Square", "Arena"],
+  ["Village Square", "Willows 1"],
+  ["Village Square", "Birches 1"],
+  ["Arena", "Beeches"],
+  ["Beeches", "Oaks 1"],
+  ["Beeches", "Birches 2"],
+  ["RPG Glade", "Meadow"],
+  ["RPG Glade", "Willows 1"],
+  ["RPG Glade", "Willows 4"],
+  ["Meadow", "Willows 4"],
+  ["Willows 1", "Willows 5"],
+  ["Willows 1", "Birches 1"],
+  ["Willows 4", "Willows 5"],
+  ["Willows 5", "Willows 2"],
+  ["Willows 5", "Birches 3"],
+  ["Birches 1", "Birches 2"],
+  ["Birches 1", "Birches 3"],
+  ["Birches 2", "Birches 3"],
+  ["Birches 2", "Oaks 2"],
+  ["Birches 3", "Oaks 3"],
+  ["Birches 3", "Oaks 4"],
+  ["Oaks 1", "Oaks 2"],
+  ["Oaks 2", "Oaks 3"],
+  ["Oaks 3", "Oaks 4"],
+  ["Oaks 4", "Chestnut"],
 ];
 
 export const areaDefinitions = [

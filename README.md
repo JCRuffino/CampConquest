@@ -2,7 +2,7 @@
 
 A real-time multiplayer territory game played across a campsite, inspired by Jet Lag: The Game's Battle for America / Schengen Showdown — and a follow-up to [BussyBodies](https://github.com/JCRuffino/BussyBodies) (Jet Lag Brighton).
 
-Three teams of two compete over the 20 zones of the Strange Games Festival at Bushy Wood Activity Centre. Every zone has one challenge, hidden until a team has physically been there (revealed by GPS, honour-system button as backup). Complete a zone's challenge and record your **result** to claim it; another team can steal it by beating that result — but a stolen zone **locks permanently**. First team to own **4 consecutive zones along one of the win lines** drawn on the map (locked or not) wins instantly. If the countdown ends first, most zones wins, locked zones break ties.
+Three teams of two compete over the 20 zones of the Strange Games Festival at Bushy Wood Activity Centre. Every zone has one challenge, hidden until a team has physically been there (revealed by GPS, honour-system button as backup). Complete a zone's challenge and record your **result** to claim it; another team can steal it by beating that result — but a stolen zone **locks permanently**. When the countdown ends, the team with the **largest connected group of zones** (via the dotted links on the map, Stateside Scramble style) wins — ties broken by total zones, then locked zones.
 
 Built with vanilla JavaScript (ES modules), [Leaflet](https://leafletjs.com/) + OpenStreetMap, and Firebase (anonymous auth + Realtime Database) for shared state.
 
@@ -11,12 +11,12 @@ Built with vanilla JavaScript (ES modules), [Leaflet](https://leafletjs.com/) + 
 - `index.html` — markup and styles for all screens (Map, Areas, Leaderboard, Settings, Rules, History)
 - `main.js` — boot sequence: data loading, Firebase listener, navigation, history screen, timer ticker, toasts
 - `map.js` — Leaflet map, area polygons, claim/steal popups, GPS auto-scouting, live player locations, admin area editor
-- `actions.js` — the claim / steal / scout / admin-reset state changes (Firebase transactions), including the 4-in-a-row win check
+- `actions.js` — the claim / steal / scout / admin-reset state changes (Firebase transactions)
 - `ui.js` — Areas screen cards, leaderboard, map scoreboard
 - `settings.js` — team assignment, team renaming, game code, game timer, area editor toggle, game reset
 - `firebase.js` — Firebase setup, transactional state updates, game log
 - `shared.js` — game state helpers, win detection, and constants shared across modules
-- `areas.js` — the 20 festival zones as named polygons plus the win lines (which runs of zones can score 4-in-a-row); zones are expanded so neighbours visibly touch
+- `areas.js` — the 20 festival zones as named polygons plus the connections between them (which drive the largest-connected-group score); zones are expanded so neighbours visibly touch
 - `challenges.csv` — challenge text per zone (tab-separated: Area, Challenge; results should be measurable so steals can "beat" them)
 
 ## Setting up the real campsite
@@ -69,6 +69,6 @@ Then open the printed local URL in a browser. For the real game, host it anywher
 
 ## How to play
 
-Open the Rules tab in the app for the full rules. In short: scout a zone by going there (its challenge is hidden until you do), complete the challenge and record your result to claim it, and steal rivals' zones by beating their recorded result — stolen zones lock forever. First to 4 consecutive zones along a win line wins on the spot; otherwise most zones when the countdown ends (locked zones break ties).
+Open the Rules tab in the app for the full rules. In short: scout a zone by going there (its challenge is hidden until you do), complete the challenge and record your result to claim it, and steal rivals' zones by beating their recorded result — stolen zones lock forever. The winner is the team with the largest connected group of zones when the countdown ends (ties: total zones, then locked zones).
 
 Players with no team assigned act as spectators/admins: they can adjust the timer, reset individual areas from the map popup, trace new areas with the editor, and reset the game (password in `settings.js`).

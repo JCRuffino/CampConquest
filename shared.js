@@ -1,4 +1,4 @@
-import { winLines } from './areas.js';
+import { connections } from './areas.js';
 
 export const states = [
   { label: "Unclaimed", color: "#808080" },
@@ -7,8 +7,6 @@ export const states = [
   { label: "Team C",    color: "#2a9d3f" },
 ];
 
-// How many areas in a straight line win the game
-export const WIN_LENGTH = 4;
 
 // Escape user-supplied strings before inserting into innerHTML
 export function esc(s) {
@@ -89,54 +87,55 @@ export function pointInPolygon(lat, lng, polygon) {
   return inside;
 }
 
-// ── WIN CONDITION ─────────────────────────────────────────────────
-// First team owning WIN_LENGTH CONSECUTIVE zones within one of the
-// winLines defined in areas.js wins — locked or not.
-// Returns [key, key, …] of the winning stretch, or null.
-export function findWinningLine(gs, team) {
-  for (const line of winLines) {
-    const keys = line.map(toKey);
-    let run = [];
-    for (const k of keys) {
-      const st = gs.areas && gs.areas[k];
-      if (st && st.owner === team) {
-        run.push(k);
-        if (run.length >= WIN_LENGTH) return run.slice(-WIN_LENGTH);
-      } else {
-        run = [];
-      }
-    }
-  }
-  return null;
-}
+// ── SCORING: LARGEST CONNECTED GROUP ──────────────────────────────
+// Stateside Scramble style — a team's score is the size of the biggest
+// group of its zones that are all connected to each other (via the
+// connections defined in areas.js).
+const adjacency = {};
+connections.forEach(([a, b]) => {
+  const ka = toKey(a), kb = toKey(b);
+  (adjacency[ka] = adjacency[ka] || []).push(kb);
+  (adjacency[kb] = adjacency[kb] || []).push(ka);
+});
 
-// Check every team — used after admin corrections to set or clear the
-// recorded winner
-export function findAnyWinner(gs) {
-  for (const t of [1, 2, 3]) {
-    const line = findWinningLine(gs, t);
-    if (line) return { team: t, line };
-  }
-  return null;
+export function largestCluster(gs, team) {
+  const owned = new Set(
+    Object.entries(gs.areas || {})
+      .filter(([, a]) => a.owner === team)
+      .map(([k]) => k)
+  );
+  let best = 0;
+  const seen = new Set();
+  owned.forEach(start => {
+    if (seen.has(start)) return;
+    let size = 0;
+    const stack = [start];
+    seen.add(start);
+    while (stack.length) {
+      const k = stack.pop();
+      size++;
+      (adjacency[k] || []).forEach(n => {
+        if (owned.has(n) && !seen.has(n)) {
+          seen.add(n);
+          stack.push(n);
+        }
+      });
+    }
+    if (size > best) best = size;
+  });
+  return best;
 }
 
 // ── GAME TIMER / GAME OVER ────────────────────────────────────────
 export function isGameOver(gs) {
-  if (!gs) return false;
-  if (gs.winner) return true;
-  return !!(gs.timer && gs.timer.endsAt && Date.now() >= gs.timer.endsAt);
+  return !!(gs && gs.timer && gs.timer.endsAt && Date.now() >= gs.timer.endsAt);
 }
 
 // Returns true (and tells the player) when the game is over — call at the
 // top of any claim/steal action to soft-block it
 export function gameOverGuard(gs) {
   if (!isGameOver(gs)) return false;
-  if (gs.winner) {
-    window.alert('🏆 The game is over — ' + teamName(gs, gs.winner.team) +
-      ' got ' + WIN_LENGTH + ' areas in a row!');
-  } else {
-    window.alert('⏱️ The game has ended!\n\nNo more areas can be claimed or stolen.\nCheck the leaderboard for the final standings.');
-  }
+  window.alert('⏱️ The game has ended!\n\nNo more areas can be claimed or stolen.\nCheck the leaderboard for the final standings.');
   return true;
 }
 
@@ -166,7 +165,7 @@ export function sanitiseForFirebase(obj) {
 }
 
 // ── SCORING ───────────────────────────────────────────────────────
-// Returns { counts: {1,2,3,0}, locked: {1,2,3} }
+// Returns { counts: {1,2,3,0}, locked: {1,2,3}, cluster: {1,2,3} }
 export function getScores(gs) {
   const counts = { 0: 0, 1: 0, 2: 0, 3: 0 };
   const locked = { 1: 0, 2: 0, 3: 0 };
@@ -174,13 +173,19 @@ export function getScores(gs) {
     counts[a.owner] = (counts[a.owner] || 0) + 1;
     if (a.owner && a.locked) locked[a.owner]++;
   });
-  return { counts, locked };
+  const cluster = {
+    1: largestCluster(gs, 1),
+    2: largestCluster(gs, 2),
+    3: largestCluster(gs, 3),
+  };
+  return { counts, locked, cluster };
 }
 
-// Sort teams by areas owned, locked areas as tiebreaker
+// Sort teams by largest connected group; total areas then locked areas
+// break ties
 export function rankTeams(gs) {
-  const { counts, locked } = getScores(gs);
+  const { counts, locked, cluster } = getScores(gs);
   return [1, 2, 3].sort((a, b) =>
-    (counts[b] - counts[a]) || (locked[b] - locked[a])
+    (cluster[b] - cluster[a]) || (counts[b] - counts[a]) || (locked[b] - locked[a])
   );
 }

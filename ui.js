@@ -1,5 +1,5 @@
 import { states, gameState, toKey, getMyTeam, esc, teamName, allAreas,
-         getScores, rankTeams, isVisited, WIN_LENGTH } from './shared.js';
+         getScores, rankTeams, isVisited } from './shared.js';
 import { updateAreaLayers } from './map.js';
 import { claimArea, scoutArea } from './actions.js';
 
@@ -10,36 +10,26 @@ export function renderAll(gs) {
   renderAreasPanel(gs);
 }
 
-// Mini scoreboard on the map: a dot and area count per team
+// Mini scoreboard on the map: per team, the size of its largest
+// connected group (the score) with total zones in brackets
 function updateMapScoreboard(gs) {
   const el = document.getElementById('map-scoreboard');
   if (!el) return;
-  const { counts, locked } = getScores(gs);
+  const { counts, cluster } = getScores(gs);
   el.innerHTML = [1, 2, 3].map(t =>
     '<span style="display:inline-flex;align-items:center;gap:4px;">' +
       '<span style="width:10px;height:10px;border-radius:50%;background:' +
         states[t].color + ';display:inline-block;"></span>' +
-      counts[t] + (locked[t] ? '<span style="font-size:10px;">🔒' + locked[t] + '</span>' : '') +
+      '🔗' + cluster[t] +
+      '<span style="font-size:10px;color:#9ca3af;">(' + counts[t] + ')</span>' +
     '</span>'
   ).join('');
 }
 
 // ── LEADERBOARD ───────────────────────────────────────────────────
 function updateLeaderboard(gs) {
-  const { counts, locked } = getScores(gs);
+  const { counts, locked, cluster } = getScores(gs);
   const sorted = rankTeams(gs);
-
-  const winnerEl = document.getElementById('lb-winner-banner');
-  if (winnerEl) {
-    if (gs.winner) {
-      winnerEl.style.display = 'block';
-      winnerEl.style.background = states[gs.winner.team].color;
-      winnerEl.textContent = '🏆 ' + teamName(gs, gs.winner.team) + ' got ' +
-        WIN_LENGTH + ' in a row and WINS!';
-    } else {
-      winnerEl.style.display = 'none';
-    }
-  }
 
   const lbEl = document.getElementById('leaderboard-rows');
   if (!lbEl) return;
@@ -54,7 +44,8 @@ function updateLeaderboard(gs) {
         '<div class="lb-dot" style="background:' + states[i].color + '"></div>' +
         '<span>' + medal + ' ' + esc(teamName(gs, i)) + '</span>' +
       '</div>' +
-      '<div class="lb-value">' + counts[i] +
+      '<div class="lb-value">🔗 ' + cluster[i] +
+        '<span style="font-size:12px;font-weight:600;color:#6b7280;margin-left:6px;">' + counts[i] + ' total</span>' +
         '<span style="font-size:12px;font-weight:600;color:#9b59b6;margin-left:6px;">🔒 ' + locked[i] + '</span>' +
       '</div>';
     lbEl.appendChild(row);

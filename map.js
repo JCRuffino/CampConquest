@@ -2,7 +2,7 @@ import { pushPlayerLocation, removePlayerLocation, listenToPlayerLocations } fro
 import { states, gameState, toKey, getMyTeam, esc, teamName,
          isVisited, pointInPolygon } from './shared.js';
 import { claimArea, scoutArea, adminResetArea } from './actions.js';
-import { siteBoundary, winLines } from './areas.js';
+import { siteBoundary, connections } from './areas.js';
 
 let map;
 let userMarker   = null;
@@ -110,7 +110,7 @@ export function addAreas(areas) {
     areaLayers[key] = { area, polygon, label };
   });
 
-  drawWinLines();
+  drawConnections();
 
   // Frame the whole site on first load
   const all = Object.values(areaLayers).map(l => l.polygon.getBounds());
@@ -119,20 +119,23 @@ export function addAreas(areas) {
   }
 }
 
-// The win lines from areas.js, drawn zone-centre to zone-centre so
-// players can see exactly which runs of 4 win the game
-function drawWinLines() {
-  winLines.forEach(line => {
-    const pts = line
-      .map(name => areaLayers[toKey(name)])
-      .filter(Boolean)
-      .map(l => l.polygon.getBounds().getCenter());
-    if (pts.length < 2) return;
+// The zone connections from areas.js, drawn zone-centre to zone-centre —
+// these define which zones count as "next to" each other for the
+// largest-connected-group score
+function drawConnections() {
+  const nodeDrawn = {};
+  connections.forEach(([a, b]) => {
+    const la = areaLayers[toKey(a)];
+    const lb = areaLayers[toKey(b)];
+    if (!la || !lb) return;
+    const pts = [la.polygon.getBounds().getCenter(), lb.polygon.getBounds().getCenter()];
     // white casing under a dark dotted line keeps it readable on any fill
     L.polyline(pts, { color: 'white',   weight: 6, opacity: 0.75, interactive: false }).addTo(map);
     L.polyline(pts, { color: '#111827', weight: 2.5, opacity: 0.8, dashArray: '1,8', lineCap: 'round', interactive: false }).addTo(map);
-    pts.forEach(p => {
-      L.circleMarker(p, {
+    [a, b].forEach((name, i) => {
+      if (nodeDrawn[name]) return;
+      nodeDrawn[name] = true;
+      L.circleMarker(pts[i], {
         radius: 4, color: 'white', weight: 2, fillColor: '#111827',
         fillOpacity: 0.9, interactive: false,
       }).addTo(map);

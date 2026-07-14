@@ -183,14 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(() => {
     const pill = document.getElementById('countdown-pill');
     const gs   = gameState.data;
-    // A 4-in-a-row win trumps the countdown
-    if (gs && gs.winner) {
-      pill.style.display = 'block';
-      pill.textContent   = '🏆 ' + (gs.teamNames && gs.teamNames[gs.winner.team] || states[gs.winner.team].label) + ' WINS!';
-      pill.classList.add('ended');
-      return;
-    }
-    const t = gs && gs.timer;
+    const t    = gs && gs.timer;
     if (!t || !t.endsAt) {
       pill.style.display = 'none';
       endLogAttempted = false;

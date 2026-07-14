@@ -451,14 +451,10 @@
   <div id="screen-leaderboard" class="screen">
     <div style="padding: 14px; max-width: 400px; margin: 0 auto;">
 
-      <div id="lb-winner-banner" style="display:none;color:white;border-radius:14px;
-        padding:16px;margin-bottom:12px;text-align:center;font-size:16px;font-weight:800;
-        box-shadow:0 2px 10px rgba(0,0,0,0.2);"></div>
-
       <div class="lb-card">
-        <h3>🏕️ Areas Controlled</h3>
+        <h3>🔗 Largest Connected Group</h3>
         <div style="font-size:11px;color:#9ca3af;margin:-8px 0 10px;">
-          First to 4 in a row along a map line wins · 🔒 = locked (stolen) areas, can't be taken
+          Biggest group of connected zones wins · ties: total zones, then 🔒 locked
         </div>
         <div id="leaderboard-rows"></div>
       </div>
@@ -596,8 +592,8 @@
         <div class="accordion-item">
           <button class="accordion-btn">🎯 Objective</button>
           <div class="accordion-body">
-            <p>Be the first team to control <strong>4 areas in a row</strong> — 4 consecutive zones along one of the dotted connection lines drawn on the map. The moment a team gets 4 in a row, the game ends and they win. Both locked and unlocked areas count.</p>
-            <p>If the countdown runs out before anyone manages it, the team controlling the most areas wins (most locked areas breaks a tie).</p>
+            <p>Build the biggest <strong>connected group</strong> of areas. The dotted links on the map show which areas count as next to each other — your score is the size of your largest group of linked areas, and the team with the biggest group when the countdown ends wins.</p>
+            <p>Both locked and unlocked areas count. Ties are broken by total areas controlled, then by locked areas.</p>
           </div>
         </div>
 
@@ -636,8 +632,8 @@
         <div class="accordion-item">
           <button class="accordion-btn">🏆 Winning</button>
           <div class="accordion-body">
-            <p><strong>Instant win:</strong> 4 consecutive areas along one of the connection lines on the map — the app announces it the moment it happens.</p>
-            <p><strong>Timer win:</strong> if the countdown ends first, most areas controlled wins; most locked areas breaks a tie.</p>
+            <p>When the countdown ends, the team with the <strong>largest connected group</strong> of areas wins — count your biggest cluster of areas joined by the dotted links on the map.</p>
+            <p>Ties are broken by total areas controlled, then by locked areas. A scattered empire loses to a connected one!</p>
           </div>
         </div>
 
