@@ -33,12 +33,17 @@ export async function claimArea(key, team, expected, result) {
       failReason = 'Your team already controls this area.';
       return;
     }
+    if ((a.failedBy || []).includes(team)) {
+      failReason = 'Your team failed this challenge — you can\'t attempt it again until another team passes it.';
+      return;
+    }
     wasSteal   = a.owner !== 0;
     prevOwner  = a.owner;
     prevResult = a.result || '';
     a.owner    = team;
     a.result   = result;
     a.locked   = wasSteal; // a stolen area locks permanently
+    a.failedBy = [];       // a pass clears everyone's lockouts
     return gs;
   });
 
@@ -80,6 +85,48 @@ export async function claimArea(key, team, expected, result) {
   return { ok: true };
 }
 
+// Record a failed challenge attempt: the team is locked out of this
+// area's challenge until another team passes it (claim or steal, which
+// clears failedBy)
+export async function failChallenge(key, team, expected) {
+  if (gameOverGuard(gameState.data)) return { ok: false };
+
+  let failReason = '';
+
+  const committed = await mutateState(gs => {
+    const a = gs.areas && gs.areas[key];
+    if (!a) return;
+    if (a.owner !== expected.owner || !!a.locked !== !!expected.locked) {
+      failReason = 'This area just changed — reopen it to see the latest state.';
+      return;
+    }
+    if (a.locked || a.owner === team) {
+      failReason = 'Nothing to fail here.';
+      return;
+    }
+    if (!Array.isArray(a.failedBy)) a.failedBy = [];
+    if (a.failedBy.includes(team)) {
+      failReason = 'Already recorded as failed.';
+      return;
+    }
+    a.failedBy.push(team);
+    return gs;
+  });
+
+  if (!committed) return { ok: false, reason: failReason || 'Could not record — please try again.' };
+
+  const gs = gameState.data;
+  const name = (gs.areas[key] && gs.areas[key].displayName) || key;
+  pushLog({
+    timestamp: Date.now(),
+    team,
+    type: 'claim',
+    message: '❌ ' + teamName(gs, team) + ' failed the challenge at ' + name +
+             ' — locked out until another team passes it',
+  });
+  return { ok: true };
+}
+
 // Mark an area as visited by a team, revealing its challenge to them.
 // Fired automatically when a player's GPS enters the area, or manually
 // (honour system) from the popup.
@@ -111,8 +158,9 @@ export async function adminResetArea(key, owner, locked) {
   const committed = await mutateState(gs => {
     const a = gs.areas && gs.areas[key];
     if (!a) return;
-    a.owner  = owner;
-    a.locked = owner === 0 ? false : !!locked;
+    a.owner    = owner;
+    a.locked   = owner === 0 ? false : !!locked;
+    a.failedBy = [];
     if (owner === 0) a.result = '';
     return gs;
   });

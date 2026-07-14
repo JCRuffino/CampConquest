@@ -13,6 +13,7 @@ function defaultState(areas) {
       owner:       0,
       locked:      false,
       result:      '',
+      failedBy:    [],
       displayName: area.name,
     };
   });
@@ -236,23 +237,28 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(r => r.text())
     .then(challengesCsv => {
 
-      // Tab-separated: Area, Challenge — challenge text can freely
-      // contain commas
+      // Tab-separated: Area, Challenge, Pass Mark — challenge text can
+      // freely contain commas
       const byName = {};
       const lines  = challengesCsv.trim().split('\n');
       lines.shift();
       lines.forEach(line => {
-        const [name, challenge] = line.split('\t');
+        const [name, challenge, passMark] = line.split('\t');
         if (!name) return;
-        byName[name.trim()] = (challenge || '').trim();
+        byName[name.trim()] = {
+          challenge: (challenge || '').trim(),
+          passMark:  (passMark || '').trim(),
+        };
       });
 
       areaDefinitions.forEach(def => {
-        if (!byName[def.name]) console.warn('⚠️ No challenge found in challenges.csv for area:', def.name);
+        const ch = byName[def.name];
+        if (!ch) console.warn('⚠️ No challenge found in challenges.csv for area:', def.name);
         allAreas.push({
           name:      def.name,
           polygon:   def.polygon,
-          challenge: byName[def.name] || '',
+          challenge: ch ? ch.challenge : '',
+          passMark:  ch ? ch.passMark : '',
         });
       });
       console.log('🏕️ Areas loaded:', allAreas.length);
@@ -283,7 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const key = toKey(area.name);
                 if (!gs.areas[key]) {
                   gs.areas[key] = {
-                    owner: 0, locked: false, result: '', displayName: area.name,
+                    owner: 0, locked: false, result: '', failedBy: [], displayName: area.name,
                   };
                 }
               });

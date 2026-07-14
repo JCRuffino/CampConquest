@@ -1,21 +1,21 @@
-Area	Challenge
-Main Campfire	Placeholder: longest continuous campfire song medley without stopping or repeating a song (record the time).
-Social Deduction Glade	Placeholder: win a round of a social deduction mini-game against volunteers — fastest correct accusation (record the time).
-Village Square	Placeholder: most items borrowed from strangers in the square in 5 minutes, returned after (record the count).
-Arena	Placeholder: most keepy-uppies / consecutive catches in the arena (record the count).
-Beeches	Placeholder: tallest freestanding stick tower (record height: knee/waist/chest/head).
-Chapel	Placeholder: recite a made-up 30-second sermon without laughing — judged funniest wins ties (record laughs suppressed 1-10).
-RPG Glade	Placeholder: most convincing monster impression rated 1-10 by a neutral player (record the score).
-Willows 1	Placeholder: most star jumps in 60 seconds (record the number).
-Birches 1	Placeholder: furthest welly throw (record the distance in paces).
-Oaks 1	Placeholder: fastest tongue twister said 3 times without a mistake (record the time).
-Meadow	Placeholder: longest handstand or headstand in the meadow (record the time).
-Willows 4	Placeholder: most thrown grapes caught in the mouth out of 10 (record the count).
-Willows 5	Placeholder: longest plank hold (record the time).
-Birches 2	Placeholder: most pieces of kindling collected and stacked in 3 minutes (record the count).
-Oaks 2	Placeholder: fastest three-legged lap of the glade (record the time).
-Willows 2	Placeholder: longest continuous tree hug without letting go (record the time).
-Birches 3	Placeholder: hide and seek — longest time hidden before your teammate finds you, max 5 minutes (record the time).
-Oaks 3	Placeholder: most bounces of a ball on a frying pan / board without dropping (record the count).
-Oaks 4	Placeholder: longest time standing perfectly still and silent while others try to make you laugh (record the time).
-Chestnut	Placeholder: build a den big enough for one teammate to hide inside — fastest build (record the time).
+Area	Challenge	Pass Mark
+Main Campfire	Placeholder: longest continuous campfire song medley without stopping or repeating a song (record the time).	2 minutes
+Social Deduction Glade	Placeholder: win a round of a social deduction mini-game against volunteers — fastest correct accusation (record the time).	Under 5 minutes
+Village Square	Placeholder: most items borrowed from strangers in the square in 5 minutes, returned after (record the count).	5 items
+Arena	Placeholder: most keepy-uppies / consecutive catches in the arena (record the count).	10
+Beeches	Placeholder: tallest freestanding stick tower (record height: knee/waist/chest/head).	Knee height
+Chapel	Placeholder: recite a made-up 30-second sermon — rated 1-10 by a neutral player (record the score).	5
+RPG Glade	Placeholder: most convincing monster impression rated 1-10 by a neutral player (record the score).	5
+Willows 1	Placeholder: most star jumps in 60 seconds (record the number).	30
+Birches 1	Placeholder: furthest welly throw (record the distance in paces).	15 paces
+Oaks 1	Placeholder: fastest tongue twister said 3 times without a mistake (record the time).	Under 30 seconds
+Meadow	Placeholder: longest handstand or headstand in the meadow (record the time).	5 seconds
+Willows 4	Placeholder: most thrown grapes caught in the mouth out of 10 (record the count).	4
+Willows 5	Placeholder: longest plank hold (record the time).	60 seconds
+Birches 2	Placeholder: most pieces of kindling collected and stacked in 3 minutes (record the count).	15 pieces
+Oaks 2	Placeholder: fastest three-legged lap of the glade (record the time).	Under 2 minutes
+Willows 2	Placeholder: longest continuous tree hug without letting go (record the time).	2 minutes
+Birches 3	Placeholder: hide and seek — longest time hidden before your teammate finds you, max 5 minutes (record the time).	2 minutes
+Oaks 3	Placeholder: most bounces of a ball on a frying pan / board without dropping (record the count).	20
+Oaks 4	Placeholder: longest time standing perfectly still and silent while others try to make you laugh (record the time).	60 seconds
+Chestnut	Placeholder: build a den big enough for one teammate to hide inside — fastest build (record the time).	Under 10 minutes

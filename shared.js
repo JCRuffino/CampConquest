@@ -148,10 +148,14 @@ export function formatCountdown(ms) {
   return h > 0 ? h + ':' + pad(m) + ':' + pad(sec) : m + ':' + pad(sec);
 }
 
-// Firebase strips empty objects — restore the containers the rest of
-// the code assumes exist
+// Firebase strips empty objects/arrays — restore the containers the
+// rest of the code assumes exist
 export function fixArrays(gs) {
   if (!gs.areas) gs.areas = {};
+  Object.values(gs.areas).forEach(a => {
+    if (!a.failedBy) a.failedBy = [];
+    else if (!Array.isArray(a.failedBy)) a.failedBy = Object.values(a.failedBy);
+  });
   if (!gs.visited) gs.visited = {};
   [1, 2, 3].forEach(t => {
     if (!gs.visited[t]) gs.visited[t] = {};

@@ -1,7 +1,7 @@
 import { pushPlayerLocation, removePlayerLocation, listenToPlayerLocations } from './firebase.js';
 import { states, gameState, toKey, getMyTeam, esc, teamName,
          isVisited, pointInPolygon } from './shared.js';
-import { claimArea, scoutArea, adminResetArea } from './actions.js';
+import { claimArea, failChallenge, scoutArea, adminResetArea } from './actions.js';
 import { siteBoundary, connections } from './areas.js';
 
 let map;
@@ -119,28 +119,61 @@ export function addAreas(areas) {
   }
 }
 
-// The zone connections from areas.js, drawn zone-centre to zone-centre —
-// these define which zones count as "next to" each other for the
-// largest-connected-group score
+// The zone connections from areas.js, drawn as short link marks that
+// straddle the shared border between the two zones (a full centre-to-
+// centre web was too busy) — these define which zones count as "next
+// to" each other for the largest-connected-group score
 function drawConnections() {
-  const nodeDrawn = {};
+  const LINK_HALF_M = 9; // link reaches this many metres into each zone
+  const kx = Math.cos(50.86 * Math.PI / 180);
+
   connections.forEach(([a, b]) => {
     const la = areaLayers[toKey(a)];
     const lb = areaLayers[toKey(b)];
     if (!la || !lb) return;
-    const pts = [la.polygon.getBounds().getCenter(), lb.polygon.getBounds().getCenter()];
-    // white casing under a dark dotted line keeps it readable on any fill
-    L.polyline(pts, { color: 'white',   weight: 6, opacity: 0.75, interactive: false }).addTo(map);
-    L.polyline(pts, { color: '#111827', weight: 2.5, opacity: 0.8, dashArray: '1,8', lineCap: 'round', interactive: false }).addTo(map);
-    [a, b].forEach((name, i) => {
-      if (nodeDrawn[name]) return;
-      nodeDrawn[name] = true;
-      L.circleMarker(pts[i], {
-        radius: 4, color: 'white', weight: 2, fillColor: '#111827',
-        fillOpacity: 0.9, interactive: false,
-      }).addTo(map);
-    });
+    const c1 = la.polygon.getBounds().getCenter();
+    const c2 = lb.polygon.getBounds().getCenter();
+
+    // unit vector from c1 to c2 in metres
+    let dx = (c2.lng - c1.lng) * 111320 * kx;
+    let dy = (c2.lat - c1.lat) * 111320;
+    const len = Math.hypot(dx, dy) || 1;
+    dx /= len; dy /= len;
+
+    // the zones are split midway between centres, so the midpoint sits
+    // on (or very near) the shared border
+    const mid = [(c1.lat + c2.lat) / 2, (c1.lng + c2.lng) / 2];
+    const p1  = [mid[0] - dy * LINK_HALF_M / 111320, mid[1] - dx * LINK_HALF_M / (111320 * kx)];
+    const p2  = [mid[0] + dy * LINK_HALF_M / 111320, mid[1] + dx * LINK_HALF_M / (111320 * kx)];
+
+    L.polyline([p1, p2], { color: 'white',   weight: 5, opacity: 0.8, lineCap: 'round', interactive: false }).addTo(map);
+    L.polyline([p1, p2], { color: '#374151', weight: 2, opacity: 0.8, lineCap: 'round', interactive: false }).addTo(map);
   });
+}
+
+// ── TEAM-COLOUR HATCH PATTERNS ────────────────────────────────────
+// Claimed-but-unlocked zones get a diagonal-stripe fill; locked zones
+// are solid. SVG patterns are injected into Leaflet's overlay SVG.
+function ensureHatchPatterns() {
+  const svg = map.getPane('overlayPane').querySelector('svg');
+  if (!svg || svg.querySelector('#hatch-1')) return;
+  const NS   = 'http://www.w3.org/2000/svg';
+  const defs = document.createElementNS(NS, 'defs');
+  [1, 2, 3].forEach(t => {
+    const pattern = document.createElementNS(NS, 'pattern');
+    pattern.setAttribute('id', 'hatch-' + t);
+    pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+    pattern.setAttribute('width', '10');
+    pattern.setAttribute('height', '10');
+    pattern.setAttribute('patternTransform', 'rotate(45)');
+    const stripe = document.createElementNS(NS, 'rect');
+    stripe.setAttribute('width', '4.5');
+    stripe.setAttribute('height', '10');
+    stripe.setAttribute('fill', states[t].color);
+    pattern.appendChild(stripe);
+    defs.appendChild(pattern);
+  });
+  svg.appendChild(defs);
 }
 
 function styleFor(owner, locked) {
@@ -149,18 +182,24 @@ function styleFor(owner, locked) {
     color:       owner === 0 ? '#9ca3af' : color,
     weight:      locked ? 4 : (owner === 0 ? 1.5 : 2.5),
     fillColor:   color,
-    fillOpacity: owner === 0 ? 0.04 : (locked ? 0.55 : 0.3),
+    fillOpacity: owner === 0 ? 0.04 : (locked ? 0.6 : 0.45),
   };
 }
 
 // Restyle every polygon from the latest game state — called on each
-// Firebase update so all phones recolour live
+// Firebase update so all phones recolour live. Claimed-but-unlocked
+// zones show hatched (stealable); locked zones are solid.
 export function updateAreaLayers(gs) {
   const myTeam = getMyTeam();
+  ensureHatchPatterns();
   Object.entries(areaLayers).forEach(([key, layer]) => {
     const a = gs.areas && gs.areas[key];
     if (!a) return;
     layer.polygon.setStyle(styleFor(a.owner, a.locked));
+    if (a.owner !== 0 && !a.locked && layer.polygon._path) {
+      // setStyle just wrote a solid fill attribute; swap it for the hatch
+      layer.polygon._path.setAttribute('fill', 'url(#hatch-' + a.owner + ')');
+    }
     const unknown = myTeam !== null && !isVisited(gs, myTeam, key);
     layer.label.setContent(
       (a.locked ? '🔒 ' : '') + (unknown ? '❓ ' : '') + esc(layer.area.name)
@@ -182,6 +221,7 @@ function handleAreaClick(area, latlng) {
 
   const isUnclaimed = a.owner === 0;
   const isMine      = myTeam !== null && a.owner === myTeam;
+  const iFailed     = myTeam !== null && (a.failedBy || []).includes(myTeam);
   // Admins see everything; teams only what they've scouted
   const revealed    = isAdmin || isVisited(gs, myTeam, key);
 
@@ -214,14 +254,27 @@ function handleAreaClick(area, latlng) {
           esc(area.challenge || 'No challenge set') + '</div>' +
       '</div>';
 
+    if (area.passMark) {
+      body +=
+        '<div style="font-size:12px;color:#374151;margin-top:6px;">' +
+          '<span style="font-weight:700;">🎯 Pass mark:</span> ' + esc(area.passMark) +
+        '</div>';
+    }
+
     if (!isUnclaimed) {
       body +=
-        '<div style="font-size:12px;color:#374151;margin-top:8px;">' +
-          '<span style="font-weight:700;">🎯 Result to beat:</span> ' +
+        '<div style="font-size:12px;color:#374151;margin-top:6px;">' +
+          '<span style="font-weight:700;">🏅 Result to beat:</span> ' +
           esc(a.result || '—') +
           ' <span style="color:#9ca3af;">(' + esc(teamName(gs, a.owner)) + ')</span>' +
         '</div>';
     }
+
+    const failedNote = (a.failedBy || []).length > 0
+      ? '<div style="font-size:11px;color:#9ca3af;margin-top:6px;">Locked out (failed): ' +
+        (a.failedBy || []).map(t => esc(teamName(gs, t))).join(', ') + '</div>'
+      : '';
+    body += failedNote;
 
     if (a.locked) {
       body += '<div style="font-size:12px;color:#6b7280;margin-top:8px;">' +
@@ -229,11 +282,15 @@ function handleAreaClick(area, latlng) {
     } else if (isMine) {
       body += '<div style="font-size:12px;color:#6b7280;margin-top:8px;">' +
         'Your area — another team can steal it (and lock it) by beating your result.</div>';
+    } else if (iFailed) {
+      body += '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
+        '❌ Your team failed this challenge — you can\'t attempt it again until another team passes it.</div>';
     } else if (myTeam !== null) {
-      const verb  = isUnclaimed ? '⛺ We Did It — Claim!' : '😈 We Beat It — Steal &amp; Lock!';
+      const verb  = isUnclaimed ? '⛺ We Passed — Claim!' : '😈 We Beat It — Steal &amp; Lock!';
       actionsHTML =
         '<button id="claim-btn" class="btn btn-full" style="margin-top:10px;background:' +
-        states[myTeam].color + ';">' + verb + '</button>';
+        states[myTeam].color + ';">' + verb + '</button>' +
+        '<button id="fail-btn" class="btn btn-neutral btn-full" style="margin-top:6px;">❌ We Failed</button>';
     } else if (isUnclaimed) {
       body += '<div style="font-size:12px;color:#9ca3af;margin-top:8px;">Join a team in Settings to claim areas.</div>';
     }
@@ -282,6 +339,18 @@ function handleAreaClick(area, latlng) {
     if (!trimmed) { showError('You must record a result.'); return; }
 
     const res = await claimArea(key, myTeam, expected, trimmed);
+    if (!res.ok) { showError(res.reason || ''); return; }
+    map.closePopup();
+  });
+
+  const failBtn = content.querySelector('#fail-btn');
+  if (failBtn) failBtn.addEventListener('click', async () => {
+    const ok = window.confirm(
+      '❌ Record a FAILED attempt at ' + area.name + '?\n\n' +
+      'Your team won\'t be able to attempt this challenge again until another team passes it.'
+    );
+    if (!ok) return;
+    const res = await failChallenge(key, myTeam, expected);
     if (!res.ok) { showError(res.reason || ''); return; }
     map.closePopup();
   });
