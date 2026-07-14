@@ -1,5 +1,5 @@
 import { pushPlayerLocation, removePlayerLocation, listenToPlayerLocations } from './firebase.js';
-import { states, gameState, toKey, getMyTeam, esc, teamName,
+import { states, gameState, toKey, getMyTeam, esc, teamName, playerNames,
          hasStarted, getCurrentAttempt, isAdminMode, formatCountdown } from './shared.js';
 import { claimArea, failChallenge, startAttempt, adminSetArea } from './actions.js';
 import { siteBoundary } from './areas.js';
@@ -275,7 +275,16 @@ function handleAreaClick(area, latlng) {
         (isUnclaimed ? '' : ' Stealing shuts the other team out — win or lose, this area locks.') +
       '</div>';
   } else {
-    // Attempt in progress — show the timer (if any) and resolve buttons
+    // Attempt in progress — phone-duty reminder, timer (if any), and
+    // resolve buttons
+    const players = playerNames(gs, myTeam);
+    const holder  = players[attempt.holder || 0];
+    const doer    = players[1 - (attempt.holder || 0)];
+    body +=
+      '<div style="font-size:12px;color:#374151;font-weight:600;margin-top:8px;' +
+        'background:#fef3c7;border-radius:8px;padding:6px 8px;">' +
+        '📱 ' + esc(holder) + ' holds the phone and reads aloud — 💪 ' + esc(doer) + ' does the challenge!' +
+      '</div>';
     if (area.timer) {
       const timerLabel = area.timer.mode === 'down'
         ? area.timer.minutes + '-minute countdown'
@@ -339,6 +348,10 @@ function handleAreaClick(area, latlng) {
     if (!ok) return;
     const res = await startAttempt(key, myTeam, expected);
     if (!res.ok) { showError(res.reason || ''); return; }
+    window.alert(
+      '📱 Make sure ' + res.holder + ' is holding the phone!\n\n' +
+      res.holder + ' reads the challenge out loud — ' + res.attempter + ' is the one who does it.'
+    );
     map.closePopup();
     // Reopen straight away, now showing the challenge and timer
     setTimeout(() => handleAreaClick(area, latlng), 150);

@@ -6,7 +6,8 @@
 // silently overwriting.
 
 import { mutateState, pushLog } from './firebase.js';
-import { gameState, teamName, gameOverGuard, largestCluster, majorityWinner } from './shared.js';
+import { gameState, teamName, gameOverGuard, largestCluster, majorityWinner,
+         playerNames } from './shared.js';
 
 // Complete the challenge → claim an unclaimed area, recording the result
 // other teams will have to beat. Stealing (owner !== 0) locks the area.
@@ -179,6 +180,7 @@ export async function startAttempt(key, team, expected) {
   if (gameOverGuard(gameState.data)) return { ok: false };
 
   let failReason = '';
+  let holderIdx  = 0;
 
   const committed = await mutateState(gs => {
     const a = gs.areas && gs.areas[key];
@@ -209,9 +211,17 @@ export async function startAttempt(key, team, expected) {
       }
       a.contestedBy = team;
     }
+    // Phone duty alternates with each challenge the team attempts: one
+    // player holds the phone and reads the challenge aloud, the other
+    // one does it
+    if (!gs.attemptTurn) gs.attemptTurn = {};
+    const turn = gs.attemptTurn[team] || 0;
+    gs.attemptTurn[team] = turn + 1;
+    holderIdx = turn % 2;
+
     if (!gs.attempts) gs.attempts = {};
     if (!gs.attempts[team]) gs.attempts[team] = {};
-    gs.attempts[team][key] = { startedAt: Date.now(), era: a.era || 0 };
+    gs.attempts[team][key] = { startedAt: Date.now(), era: a.era || 0, holder: holderIdx };
     return gs;
   });
 
@@ -231,7 +241,13 @@ export async function startAttempt(key, team, expected) {
         teamName(gs, expected.owner) + ' — win or lose, it locks!'
       : '▶️ ' + teamName(gs, team) + ' started the challenge at ' + name,
   });
-  return { ok: true };
+
+  const players = playerNames(gs, team);
+  return {
+    ok: true,
+    holder:    players[holderIdx],
+    attempter: players[1 - holderIdx],
+  };
 }
 
 // Admin: set an area to any state — ownership, lock, the current result

@@ -66,6 +66,12 @@ export function findArea(key) {
   return allAreas.find(a => toKey(a.name) === key) || null;
 }
 
+// The two players on a team (entered when the team is joined)
+export function playerNames(gs, team) {
+  const p = (gs && gs.players && gs.players[team]) || [];
+  return [p[0] || 'Player 1', p[1] || 'Player 2'];
+}
+
 // ── ADMIN MODE ────────────────────────────────────────────────────
 // Unlocked per-device with the admin password (Settings → Admin)
 export function isAdminMode() {
@@ -209,8 +215,12 @@ export function fixArrays(gs) {
     else if (!Array.isArray(a.failedBy)) a.failedBy = Object.values(a.failedBy);
   });
   if (!gs.attempts) gs.attempts = {};
+  if (!gs.players) gs.players = {};
   [1, 2, 3].forEach(t => {
     if (!gs.attempts[t]) gs.attempts[t] = {};
+    const p = gs.players[t];
+    if (!p) gs.players[t] = [];
+    else if (!Array.isArray(p)) gs.players[t] = Object.values(p);
   });
 }
 

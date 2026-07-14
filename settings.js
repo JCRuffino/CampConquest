@@ -47,9 +47,24 @@ export function initSettings(resetCallback) {
       const myTeam = getMyTeam();
       if (myTeam === t) setMyTeam(null);
       else if (myTeam !== null) return;
-      else setMyTeam(t);
+      else {
+        // Challenges alternate between the two players, so the app
+        // needs both names when a team is joined
+        const existing = (gameState.data && gameState.data.players && gameState.data.players[t]) || [];
+        const n1 = window.prompt('👤 First team member\'s name?', existing[0] || '');
+        if (n1 === null) return; // cancelled — don't join
+        const n2 = window.prompt('👤 Second team member\'s name?', existing[1] || '');
+        if (n2 === null) return;
+        const names = [n1.trim().slice(0, 15) || 'Player 1', n2.trim().slice(0, 15) || 'Player 2'];
+        setMyTeam(t);
+        mutateState(gs => {
+          if (!gs.players) gs.players = {};
+          gs.players[t] = names;
+          return gs;
+        });
+      }
       refreshAssignUI();
-      // Re-render UI so claim/lock buttons update immediately
+      // Re-render UI so claim/steal buttons update immediately
       if (gameState.data) {
         import('./ui.js').then(({ renderAll }) => renderAll(gameState.data));
       }
