@@ -10,13 +10,16 @@ function defaultState(areas) {
   const areaState = {};
   areas.forEach(area => {
     areaState[toKey(area.name)] = {
-      owner:         0,
-      locked:        false,
-      failedControl: [],
-      displayName:   area.name,
+      owner:       0,
+      locked:      false,
+      result:      '',
+      displayName: area.name,
     };
   });
-  return { areas: areaState };
+  return {
+    areas:   areaState,
+    visited: { 1: {}, 2: {}, 3: {} },
+  };
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -179,7 +182,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   setInterval(() => {
     const pill = document.getElementById('countdown-pill');
-    const t    = gameState.data && gameState.data.timer;
+    const gs   = gameState.data;
+    // A 4-in-a-row win trumps the countdown
+    if (gs && gs.winner) {
+      pill.style.display = 'block';
+      pill.textContent   = '🏆 ' + (gs.teamNames && gs.teamNames[gs.winner.team] || states[gs.winner.team].label) + ' WINS!';
+      pill.classList.add('ended');
+      return;
+    }
+    const t = gs && gs.timer;
     if (!t || !t.endsAt) {
       pill.style.display = 'none';
       endLogAttempted = false;
@@ -232,28 +243,25 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(r => r.text())
     .then(challengesCsv => {
 
-      // Tab-separated: Area, Initial Challenge, Control Challenge —
-      // challenge text can freely contain commas
+      // Tab-separated: Area, Challenge — challenge text can freely
+      // contain commas
       const byName = {};
       const lines  = challengesCsv.trim().split('\n');
       lines.shift();
       lines.forEach(line => {
-        const [name, initial, control] = line.split('\t');
+        const [name, challenge] = line.split('\t');
         if (!name) return;
-        byName[name.trim()] = {
-          initialChallenge: (initial || '').trim(),
-          controlChallenge: (control || '').trim(),
-        };
+        byName[name.trim()] = (challenge || '').trim();
       });
 
       areaDefinitions.forEach(def => {
-        const ch = byName[def.name];
-        if (!ch) console.warn('⚠️ No challenges found in challenges.csv for area:', def.name);
+        if (!byName[def.name]) console.warn('⚠️ No challenge found in challenges.csv for area:', def.name);
         allAreas.push({
-          name:             def.name,
-          polygon:          def.polygon,
-          initialChallenge: ch ? ch.initialChallenge : '',
-          controlChallenge: ch ? ch.controlChallenge : '',
+          name:      def.name,
+          polygon:   def.polygon,
+          row:       def.row,
+          col:       def.col,
+          challenge: byName[def.name] || '',
         });
       });
       console.log('🏕️ Areas loaded:', allAreas.length);
@@ -284,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const key = toKey(area.name);
                 if (!gs.areas[key]) {
                   gs.areas[key] = {
-                    owner: 0, locked: false, failedControl: [], displayName: area.name,
+                    owner: 0, locked: false, result: '', displayName: area.name,
                   };
                 }
               });

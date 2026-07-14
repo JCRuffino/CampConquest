@@ -2,7 +2,7 @@
 
 A real-time multiplayer territory game played across a campsite, inspired by Jet Lag: The Game's Battle for America / Schengen Showdown — and a follow-up to [BussyBodies](https://github.com/JCRuffino/BussyBodies) (Jet Lag Brighton).
 
-Three teams of two claim areas of the campsite on a live map. Every area has an **initial challenge** (complete it to claim/steal the area) and a **control challenge** (complete it to lock the area in permanently — but fail it and your team can never attempt it again, leaving the area stealable). The team controlling the most areas when the timer ends wins; locked areas break ties.
+Three teams of two compete over the 20 zones of the Strange Games Festival at Bushy Wood Activity Centre. Every zone has one challenge, hidden until a team has physically been there (revealed by GPS, honour-system button as backup). Complete a zone's challenge and record your **result** to claim it; another team can steal it by beating that result — but a stolen zone **locks permanently**. First team to own **4 zones in a straight line** (row, column or diagonal of the site grid; locked or not) wins instantly. If the countdown ends first, most zones wins, locked zones break ties.
 
 Built with vanilla JavaScript (ES modules), [Leaflet](https://leafletjs.com/) + OpenStreetMap, and Firebase (anonymous auth + Realtime Database) for shared state.
 
@@ -10,18 +10,18 @@ Built with vanilla JavaScript (ES modules), [Leaflet](https://leafletjs.com/) + 
 
 - `index.html` — markup and styles for all screens (Map, Areas, Leaderboard, Settings, Rules, History)
 - `main.js` — boot sequence: data loading, Firebase listener, navigation, history screen, timer ticker, toasts
-- `map.js` — Leaflet map, area polygons, claim/lock popups, live player locations, admin area editor
-- `actions.js` — the claim / lock / fail-control / admin-reset state changes (Firebase transactions)
+- `map.js` — Leaflet map, area polygons, claim/steal popups, GPS auto-scouting, live player locations, admin area editor
+- `actions.js` — the claim / steal / scout / admin-reset state changes (Firebase transactions), including the 4-in-a-row win check
 - `ui.js` — Areas screen cards, leaderboard, map scoreboard
-- `settings.js` — team assignment, team renaming, game timer, area editor toggle, game reset
+- `settings.js` — team assignment, team renaming, game code, game timer, area editor toggle, game reset
 - `firebase.js` — Firebase setup, transactional state updates, game log
-- `shared.js` — game state helpers and constants shared across modules
-- `areas.js` — the campsite areas as named polygons (currently **placeholders** — see below)
-- `challenges.csv` — challenge text per area (tab-separated: Area, Initial Challenge, Control Challenge)
+- `shared.js` — game state helpers, win detection, and constants shared across modules
+- `areas.js` — the 20 festival zones as named polygons with their connect-4 grid positions (georeferenced from the festival site map; refine with the in-app Area Editor)
+- `challenges.csv` — challenge text per zone (tab-separated: Area, Challenge; results should be measurable so steals can "beat" them)
 
 ## Setting up the real campsite
 
-1. **Location** — the game is set at **Bushy Wood Activity Centre**, Baden Powell Way, Hailsham BN27 3LZ. The 12 areas in `areas.js` tile the real site boundary (from OpenStreetMap) as a grid with placeholder names. To replace them with the real zones (lodges, campfire circle, archery range…), open the app as an admin (no team assigned), go to Settings → **Area Editor**, tap the corners of each real area on the map, and press Finish. Paste the generated snippets into `areas.js`, replacing the placeholders — and update the names in `challenges.csv` to match.
+1. **Zones** — the 20 festival zones in `areas.js` were placed by georeferencing the Strange Games Festival site map onto the real site boundary, so placements are close but not exact. To refine one: open the app as an admin (no team assigned), Settings → **Area Editor**, trace the zone's corners on the map, press Finish, and paste the snippet into `areas.js` (it asks for the zone's grid row/col too).
 2. **Challenges** — edit `challenges.csv` (tab-separated). The `Area` column must exactly match the `name` in `areas.js`.
 3. **Site illustration (optional)** — to use a nicer hand-drawn map instead of raw OSM tiles, drop the image in this folder and set `SITE_IMAGE` at the top of `map.js` with the image URL and the lat/lng bounds it covers.
 

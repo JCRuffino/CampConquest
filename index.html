@@ -451,10 +451,14 @@
   <div id="screen-leaderboard" class="screen">
     <div style="padding: 14px; max-width: 400px; margin: 0 auto;">
 
+      <div id="lb-winner-banner" style="display:none;color:white;border-radius:14px;
+        padding:16px;margin-bottom:12px;text-align:center;font-size:16px;font-weight:800;
+        box-shadow:0 2px 10px rgba(0,0,0,0.2);"></div>
+
       <div class="lb-card">
         <h3>🏕️ Areas Controlled</h3>
         <div style="font-size:11px;color:#9ca3af;margin:-8px 0 10px;">
-          🔒 = locked areas (can't be stolen; tiebreaker)
+          First to 4 in a row wins · 🔒 = locked (stolen) areas, can't be taken
         </div>
         <div id="leaderboard-rows"></div>
       </div>
@@ -592,31 +596,32 @@
         <div class="accordion-item">
           <button class="accordion-btn">🎯 Objective</button>
           <div class="accordion-body">
-            <p>Take control of areas of the campsite. When the game timer runs out, the team controlling the most areas wins. If teams are tied, the team with more <strong>locked</strong> areas wins.</p>
+            <p>Be the first team to control <strong>4 areas in a row</strong> — a straight line across the site grid (along a row, a column, or diagonally). The moment a team gets 4 in a row, the game ends and they win. Both locked and unlocked areas count.</p>
+            <p>If the countdown runs out before anyone manages it, the team controlling the most areas wins (most locked areas breaks a tie).</p>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <button class="accordion-btn">🔍 Scouting</button>
+          <div class="accordion-body">
+            <p>Every area has a challenge, but it's hidden until your team has been there. Walk into an area and it reveals itself automatically (via GPS) — or use the "We're Here" button if GPS is being slow under the trees.</p>
+            <p>Areas your team hasn't scouted show a ❓ on the map.</p>
           </div>
         </div>
 
         <div class="accordion-item">
           <button class="accordion-btn">⛺ Claiming Areas</button>
           <div class="accordion-body">
-            <p>Every area has an <strong>initial challenge</strong>. Go to the area, complete its initial challenge as a team, then tap the area on the map and press Claim. It turns your team's colour and counts towards your score.</p>
-            <p>Teams are on their honour — only press Claim when you've genuinely completed the challenge!</p>
+            <p>Go to an unclaimed area, complete its challenge, and press Claim. You'll record your <strong>result</strong> (a number, time, distance…) — this becomes the score other teams must beat to steal the area from you.</p>
+            <p>Teams are on their honour — only press Claim when you've genuinely done it, and record your result honestly!</p>
           </div>
         </div>
 
         <div class="accordion-item">
-          <button class="accordion-btn">🔒 Locking Areas</button>
+          <button class="accordion-btn">😈 Stealing &amp; Locking</button>
           <div class="accordion-body">
-            <p>Once you control an area you unlock its <strong>control challenge</strong>. Complete it to lock the area in — a locked area is yours for the rest of the game and can never be stolen.</p>
-            <p>But be careful: if you attempt the control challenge and <strong>fail</strong>, your team can never attempt that area's control challenge again. The area stays yours, but it remains open for other teams to steal.</p>
-          </div>
-        </div>
-
-        <div class="accordion-item">
-          <button class="accordion-btn">😈 Stealing Areas</button>
-          <div class="accordion-body">
-            <p>Any area that is claimed but <strong>not locked</strong> can be stolen. Complete the area's initial challenge and press Steal — ownership transfers to your team.</p>
-            <p>After stealing, you can attempt the control challenge to lock it (unless your team already failed that area's control challenge earlier).</p>
+            <p>Any claimed area can be stolen: go there, attempt the <strong>same challenge</strong>, and <strong>beat the recorded result</strong>. The area transfers to your team and is <strong>locked</strong> — locked areas can never be stolen again and stay yours for the rest of the game.</p>
+            <p>So a weak result invites a steal, but every steal permanently settles that area. Choose your battles!</p>
           </div>
         </div>
 
@@ -624,14 +629,15 @@
           <button class="accordion-btn">👥 Teams</button>
           <div class="accordion-body">
             <p>Three teams of two players. Join your team in Settings — your live location is then shared on the map so everyone can see where the action is.</p>
-            <p>Anyone with no team assigned is a spectator/admin: they can adjust the timer, fix mistakes on any area, and reset the game.</p>
+            <p>Anyone with no team assigned is a spectator/admin: they see all challenges, can adjust the timer, fix mistakes on any area, and reset the game.</p>
           </div>
         </div>
 
         <div class="accordion-item">
           <button class="accordion-btn">🏆 Winning</button>
           <div class="accordion-body">
-            <p>The game ends when the countdown hits zero. Most areas controlled wins; most locked areas breaks a tie. Locked and unlocked areas are otherwise worth the same.</p>
+            <p><strong>Instant win:</strong> 4 areas in a straight line on the site grid — the app announces it the moment it happens.</p>
+            <p><strong>Timer win:</strong> if the countdown ends first, most areas controlled wins; most locked areas breaks a tie.</p>
           </div>
         </div>
 
@@ -656,9 +662,10 @@
           style="flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px;
                  font-size:13px;font-family:inherit;outline:none;background:white;">
           <option value="all">All Types</option>
-          <option value="area">⛺ Claims &amp; Steals</option>
-          <option value="lock">🔒 Locks</option>
-          <option value="timer">⏱️ Timer</option>
+          <option value="claim">⛺ Claims</option>
+          <option value="steal">😈 Steals</option>
+          <option value="scout">🔍 Scouting</option>
+          <option value="timer">⏱️ Game events</option>
         </select>
       </div>
 

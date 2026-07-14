@@ -1,7 +1,7 @@
-import { states, gameState, toKey, getMyTeam, esc, teamName,
-         allAreas, getScores, rankTeams } from './shared.js';
+import { states, gameState, toKey, getMyTeam, esc, teamName, allAreas,
+         getScores, rankTeams, isVisited, WIN_LENGTH } from './shared.js';
 import { updateAreaLayers } from './map.js';
-import { claimArea, lockArea, failControl } from './actions.js';
+import { claimArea, scoutArea } from './actions.js';
 
 export function renderAll(gs) {
   updateLeaderboard(gs);
@@ -28,6 +28,18 @@ function updateMapScoreboard(gs) {
 function updateLeaderboard(gs) {
   const { counts, locked } = getScores(gs);
   const sorted = rankTeams(gs);
+
+  const winnerEl = document.getElementById('lb-winner-banner');
+  if (winnerEl) {
+    if (gs.winner) {
+      winnerEl.style.display = 'block';
+      winnerEl.style.background = states[gs.winner.team].color;
+      winnerEl.textContent = '🏆 ' + teamName(gs, gs.winner.team) + ' got ' +
+        WIN_LENGTH + ' in a row and WINS!';
+    } else {
+      winnerEl.style.display = 'none';
+    }
+  }
 
   const lbEl = document.getElementById('leaderboard-rows');
   if (!lbEl) return;
@@ -86,13 +98,14 @@ function updateLeaderboard(gs) {
 }
 
 // ── AREAS SCREEN ──────────────────────────────────────────────────
-// One card per area: status, both challenges, and the same actions as
-// the map popup so everything can be driven from this list too
+// One card per area: status, the challenge (if scouted), the result to
+// beat, and the same actions as the map popup
 function renderAreasPanel(gs) {
   const list = document.getElementById('areas-list');
   if (!list) return;
 
-  const myTeam = getMyTeam();
+  const myTeam  = getMyTeam();
+  const isAdmin = myTeam === null;
   list.innerHTML = '';
 
   allAreas.forEach(area => {
@@ -103,35 +116,52 @@ function renderAreasPanel(gs) {
     const expected    = { owner: a.owner, locked: !!a.locked };
     const isUnclaimed = a.owner === 0;
     const isMine      = myTeam !== null && a.owner === myTeam;
-    const iFailed     = myTeam !== null && (a.failedControl || []).includes(myTeam);
+    const revealed    = isAdmin || isVisited(gs, myTeam, key);
 
     const chipColor = a.locked ? '#9b59b6' : states[a.owner].color;
     const chipText  = a.locked
       ? '🔒 ' + teamName(gs, a.owner)
       : isUnclaimed ? 'Unclaimed' : teamName(gs, a.owner);
 
-    const failedNote = (a.failedControl || []).length > 0
-      ? '<div style="font-size:11px;color:#9ca3af;margin-top:6px;">Control failed by: ' +
-        (a.failedControl || []).map(t => esc(teamName(gs, t))).join(', ') + '</div>'
-      : '';
+    let challengeHTML;
+    if (revealed) {
+      challengeHTML =
+        '<div style="font-size:12px;color:#374151;margin-top:6px;line-height:1.5;">' +
+          '<span style="font-weight:700;color:#f4a300;">⚡ Challenge:</span> ' +
+          esc(area.challenge || '—') +
+        '</div>' +
+        (!isUnclaimed
+          ? '<div style="font-size:12px;color:#374151;margin-top:4px;">' +
+              '<span style="font-weight:700;">🎯 Result to beat:</span> ' + esc(a.result || '—') +
+            '</div>'
+          : '');
+    } else {
+      challengeHTML =
+        '<div style="font-size:12px;color:#9ca3af;margin-top:6px;font-style:italic;">' +
+          '❓ Not scouted yet — go there to reveal the challenge.' +
+        '</div>';
+    }
 
     let buttonsHTML = '';
-    if (!a.locked && myTeam !== null) {
-      if (isMine && !iFailed) {
-        buttonsHTML =
-          '<div class="card-buttons" style="margin-top:10px;">' +
-            '<button class="btn" data-action="lock" style="background:#9b59b6;">🔒 Lock It In</button>' +
-            '<button class="btn btn-neutral" data-action="fail">❌ We Failed</button>' +
-          '</div>';
-      } else if (!isMine) {
-        buttonsHTML =
-          '<div class="card-buttons" style="margin-top:10px;">' +
-            '<button class="btn" data-action="claim" style="background:' + states[myTeam].color + ';">' +
-              (isUnclaimed ? '⛺ Claim' : '😈 Steal') +
-            '</button>' +
-          '</div>';
-      }
+    if (!a.locked && myTeam !== null && !isMine && revealed) {
+      buttonsHTML =
+        '<div class="card-buttons" style="margin-top:10px;">' +
+          '<button class="btn" data-action="claim" style="background:' + states[myTeam].color + ';">' +
+            (isUnclaimed ? '⛺ Claim' : '😈 Steal & Lock') +
+          '</button>' +
+        '</div>';
+    } else if (myTeam !== null && !revealed) {
+      buttonsHTML =
+        '<div class="card-buttons" style="margin-top:10px;">' +
+          '<button class="btn btn-amber" data-action="scout">📍 We\'re Here — Reveal</button>' +
+        '</div>';
     }
+
+    const statusNote = a.locked
+      ? '<div style="font-size:11px;color:#9ca3af;margin-top:6px;">Stolen areas are locked for the rest of the game.</div>'
+      : (isMine
+        ? '<div style="font-size:11px;color:#9ca3af;margin-top:6px;">Yours — another team can steal it by beating your result.</div>'
+        : '');
 
     const card = document.createElement('div');
     card.className = 'challenge-card';
@@ -140,15 +170,8 @@ function renderAreasPanel(gs) {
         '<span class="card-badge" style="background:' + chipColor + ';">' + esc(chipText) + '</span>' +
         esc(area.name) +
       '</div>' +
-      '<div style="font-size:12px;color:#374151;margin-top:6px;line-height:1.5;">' +
-        '<span style="font-weight:700;color:#f4a300;">⚡ Initial:</span> ' +
-        esc(area.initialChallenge || '—') +
-      '</div>' +
-      '<div style="font-size:12px;color:#374151;margin-top:4px;line-height:1.5;">' +
-        '<span style="font-weight:700;color:#9b59b6;">🔒 Control:</span> ' +
-        esc(area.controlChallenge || '—') +
-      '</div>' +
-      failedNote +
+      challengeHTML +
+      statusNote +
       '<div class="error-msg"></div>' +
       buttonsHTML;
 
@@ -158,27 +181,31 @@ function renderAreasPanel(gs) {
       errorEl.style.display = 'block';
     }
 
-    card.querySelectorAll('[data-action]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const action = btn.dataset.action;
-        let confirmMsg, fn;
-        if (action === 'claim') {
-          confirmMsg = (isUnclaimed ? '⛺ Claim ' : '😈 Steal ') + area.name + '?\n\n' +
-            'Only press this once your team has genuinely completed the initial challenge!';
-          fn = claimArea;
-        } else if (action === 'lock') {
-          confirmMsg = '🔒 Lock ' + area.name + '?\n\n' +
-            'Only press this once your team has genuinely completed the control challenge.';
-          fn = lockArea;
-        } else {
-          confirmMsg = '❌ Record a failed control challenge at ' + area.name + '?\n\n' +
-            'Your team will NOT be able to attempt it again.';
-          fn = failControl;
-        }
-        if (!window.confirm(confirmMsg)) return;
-        const res = await fn(key, myTeam, expected);
-        if (!res.ok && res.reason) showError(res.reason);
-      });
+    const claimBtn = card.querySelector('[data-action="claim"]');
+    if (claimBtn) claimBtn.addEventListener('click', async () => {
+      const confirmMsg = isUnclaimed
+        ? '⛺ Claim ' + area.name + '?\n\nOnly press this once your team has genuinely completed the challenge!'
+        : '😈 Steal ' + area.name + '?\n\nOnly press this if your team genuinely BEAT the result "' +
+          (a.result || '—') + '".\nStolen areas lock permanently!';
+      if (!window.confirm(confirmMsg)) return;
+      const result = window.prompt(
+        '🎯 What result did your team get?\n(e.g. "14 catches", "38 seconds" — this is what others must beat)'
+      );
+      if (result === null) return;
+      const trimmed = result.trim().slice(0, 60);
+      if (!trimmed) { showError('You must record a result.'); return; }
+      const res = await claimArea(key, myTeam, expected, trimmed);
+      if (!res.ok && res.reason) showError(res.reason);
+    });
+
+    const scoutBtn = card.querySelector('[data-action="scout"]');
+    if (scoutBtn) scoutBtn.addEventListener('click', async () => {
+      const ok = window.confirm(
+        '📍 Reveal the challenge at ' + area.name + '?\n\n' +
+        'Honour system: only do this if your team is genuinely AT this area.'
+      );
+      if (!ok) return;
+      await scoutArea(key, myTeam, false);
     });
 
     list.appendChild(card);

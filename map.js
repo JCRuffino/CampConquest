@@ -1,6 +1,7 @@
 import { pushPlayerLocation, removePlayerLocation, listenToPlayerLocations } from './firebase.js';
-import { states, gameState, toKey, getMyTeam, esc, teamName } from './shared.js';
-import { claimArea, lockArea, failControl, adminResetArea } from './actions.js';
+import { states, gameState, toKey, getMyTeam, esc, teamName,
+         isVisited, pointInPolygon } from './shared.js';
+import { claimArea, scoutArea, adminResetArea } from './actions.js';
 import { siteBoundary } from './areas.js';
 
 let map;
@@ -58,6 +59,7 @@ export function initMap() {
         radius, color: '#4285F4', fillOpacity: 0.1, weight: 1
       }).addTo(map);
     }
+    autoScout(e.latlng);
   });
 
   map.on('click', handleEditorClick);
@@ -67,6 +69,19 @@ export function initMap() {
 
 export function getMap() {
   return map;
+}
+
+// Walking into an area reveals its challenge to your team
+function autoScout(latlng) {
+  const gs     = gameState.data;
+  const myTeam = getMyTeam();
+  if (!gs || !myTeam) return;
+  Object.entries(areaLayers).forEach(([key, layer]) => {
+    if (isVisited(gs, myTeam, key)) return;
+    if (pointInPolygon(latlng.lat, latlng.lng, layer.area.polygon)) {
+      scoutArea(key, myTeam, true);
+    }
+  });
 }
 
 // ── AREA POLYGONS ─────────────────────────────────────────────────
@@ -116,12 +131,14 @@ function styleFor(owner, locked) {
 // Restyle every polygon from the latest game state — called on each
 // Firebase update so all phones recolour live
 export function updateAreaLayers(gs) {
+  const myTeam = getMyTeam();
   Object.entries(areaLayers).forEach(([key, layer]) => {
     const a = gs.areas && gs.areas[key];
     if (!a) return;
     layer.polygon.setStyle(styleFor(a.owner, a.locked));
+    const unknown = myTeam !== null && !isVisited(gs, myTeam, key);
     layer.label.setContent(
-      (a.locked ? '🔒 ' : '') + esc(layer.area.name)
+      (a.locked ? '🔒 ' : '') + (unknown ? '❓ ' : '') + esc(layer.area.name)
     );
   });
 }
@@ -135,63 +152,67 @@ function handleAreaClick(area, latlng) {
   if (!a) return;
 
   const myTeam   = getMyTeam();
+  const isAdmin  = myTeam === null;
   const expected = { owner: a.owner, locked: !!a.locked };
 
   const isUnclaimed = a.owner === 0;
   const isMine      = myTeam !== null && a.owner === myTeam;
-  const iFailed     = myTeam !== null && (a.failedControl || []).includes(myTeam);
+  // Admins see everything; teams only what they've scouted
+  const revealed    = isAdmin || isVisited(gs, myTeam, key);
 
   const statusText = a.locked
-    ? '🔒 Locked by ' + esc(teamName(gs, a.owner))
+    ? '🔒 Locked by ' + esc(teamName(gs, a.owner)) + ' — cannot be taken'
     : isUnclaimed
       ? 'Unclaimed'
-      : 'Claimed by ' + esc(teamName(gs, a.owner)) + ' — not locked';
-
-  function challengeBlock(title, color, text) {
-    return (
-      '<div style="margin-top:8px;">' +
-        '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;' +
-          'font-weight:700;color:white;background:' + color + ';">' + title + '</span>' +
-        '<div style="font-size:12px;color:#374151;margin-top:4px;line-height:1.5;">' + esc(text) + '</div>' +
-      '</div>'
-    );
-  }
+      : 'Claimed by ' + esc(teamName(gs, a.owner)) + ' — can be stolen';
 
   let body = '';
   let actionsHTML = '';
 
-  if (a.locked) {
-    body = '<div style="font-size:12px;color:#6b7280;margin-top:8px;">' +
-      'This area is locked in permanently and cannot be stolen.</div>';
-  } else if (isMine) {
-    // Owner sees the control challenge to try to lock it in
-    body = challengeBlock('🔒 Control Challenge', '#9b59b6', area.controlChallenge || 'No challenge set');
-    if (iFailed) {
-      body += '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
-        '❌ Your team failed this control challenge — you cannot attempt it again. ' +
-        'The area stays yours unless another team steals it.</div>';
-    } else {
+  if (!revealed) {
+    body =
+      '<div style="font-size:12px;color:#6b7280;margin-top:8px;line-height:1.5;">' +
+        '❓ Your team hasn\'t scouted this area yet — the challenge is revealed ' +
+        'automatically when you walk into it.' +
+      '</div>';
+    if (myTeam !== null) {
       actionsHTML =
-        '<button id="lock-btn" class="btn btn-full" style="margin-top:10px;background:#9b59b6;">🔒 We Won — Lock It In!</button>' +
-        '<button id="fail-btn" class="btn btn-neutral btn-full" style="margin-top:6px;">❌ We Failed the Challenge</button>';
+        '<button id="scout-btn" class="btn btn-amber btn-full" style="margin-top:10px;">' +
+        '📍 We\'re Here — Reveal Challenge</button>';
     }
   } else {
-    // Unclaimed, or another team's unlocked area: show the initial challenge
-    body = challengeBlock('⚡ Initial Challenge', '#f4a300', area.initialChallenge || 'No challenge set');
-    if (myTeam === null) {
-      body += '<div style="font-size:12px;color:#9ca3af;margin-top:8px;">Join a team in Settings to claim areas.</div>';
-    } else {
-      const verb = isUnclaimed ? '⛺ We Did It — Claim!' : '😈 We Did It — Steal!';
+    body =
+      '<div style="margin-top:8px;">' +
+        '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;' +
+          'font-weight:700;color:white;background:#f4a300;">⚡ Challenge</span>' +
+        '<div style="font-size:12px;color:#374151;margin-top:4px;line-height:1.5;">' +
+          esc(area.challenge || 'No challenge set') + '</div>' +
+      '</div>';
+
+    if (!isUnclaimed) {
+      body +=
+        '<div style="font-size:12px;color:#374151;margin-top:8px;">' +
+          '<span style="font-weight:700;">🎯 Result to beat:</span> ' +
+          esc(a.result || '—') +
+          ' <span style="color:#9ca3af;">(' + esc(teamName(gs, a.owner)) + ')</span>' +
+        '</div>';
+    }
+
+    if (a.locked) {
+      body += '<div style="font-size:12px;color:#6b7280;margin-top:8px;">' +
+        'This area was stolen and is locked in for the rest of the game.</div>';
+    } else if (isMine) {
+      body += '<div style="font-size:12px;color:#6b7280;margin-top:8px;">' +
+        'Your area — another team can steal it (and lock it) by beating your result.</div>';
+    } else if (myTeam !== null) {
+      const verb  = isUnclaimed ? '⛺ We Did It — Claim!' : '😈 We Beat It — Steal &amp; Lock!';
       actionsHTML =
         '<button id="claim-btn" class="btn btn-full" style="margin-top:10px;background:' +
         states[myTeam].color + ';">' + verb + '</button>';
+    } else if (isUnclaimed) {
+      body += '<div style="font-size:12px;color:#9ca3af;margin-top:8px;">Join a team in Settings to claim areas.</div>';
     }
   }
-
-  const failedNote = (a.failedControl || []).length > 0
-    ? '<div style="font-size:11px;color:#9ca3af;margin-top:8px;">Control challenge failed by: ' +
-      (a.failedControl || []).map(t => esc(teamName(gs, t))).join(', ') + '</div>'
-    : '';
 
   const content = document.createElement('div');
   content.className = 'popup-box';
@@ -200,8 +221,7 @@ function handleAreaClick(area, latlng) {
     '<div class="popup-sub">' + statusText + '</div>' +
     body +
     '<div class="error-msg" id="popup-error"></div>' +
-    actionsHTML +
-    failedNote;
+    actionsHTML;
 
   function showError(msg) {
     const el = content.querySelector('#popup-error');
@@ -209,47 +229,40 @@ function handleAreaClick(area, latlng) {
     el.style.display = 'block';
   }
 
+  const scoutBtn = content.querySelector('#scout-btn');
+  if (scoutBtn) scoutBtn.addEventListener('click', async () => {
+    const ok = window.confirm(
+      '📍 Reveal the challenge at ' + area.name + '?\n\n' +
+      'Honour system: only do this if your team is genuinely AT this area.\n' +
+      '(It normally reveals itself via GPS when you walk in.)'
+    );
+    if (!ok) return;
+    await scoutArea(key, myTeam, false);
+    map.closePopup();
+  });
+
   const claimBtn = content.querySelector('#claim-btn');
   if (claimBtn) claimBtn.addEventListener('click', async () => {
-    const challengeName = isUnclaimed ? 'initial challenge' : 'steal';
-    const ok = window.confirm(
-      (isUnclaimed ? '⛺ Claim ' : '😈 Steal ') + area.name + '?\n\n' +
-      'Only press this once your team has genuinely completed the initial challenge!'
-    );
-    if (!ok) return;
-    const res = await claimArea(key, myTeam, expected);
-    if (!res.ok) { showError(res.reason || ''); return; }
-    map.closePopup();
-  });
+    const confirmMsg = isUnclaimed
+      ? '⛺ Claim ' + area.name + '?\n\nOnly press this once your team has genuinely completed the challenge!'
+      : '😈 Steal ' + area.name + '?\n\nOnly press this if your team genuinely BEAT the result "' +
+        (a.result || '—') + '".\nStolen areas lock permanently!';
+    if (!window.confirm(confirmMsg)) return;
 
-  const lockBtn = content.querySelector('#lock-btn');
-  if (lockBtn) lockBtn.addEventListener('click', async () => {
-    const ok = window.confirm(
-      '🔒 Lock ' + area.name + '?\n\n' +
-      'Only press this once your team has genuinely completed the control challenge.\n' +
-      'Locked areas are yours for the rest of the game.'
+    const result = window.prompt(
+      '🎯 What result did your team get?\n(e.g. "14 catches", "38 seconds" — this is what others must beat)'
     );
-    if (!ok) return;
-    const res = await lockArea(key, myTeam, expected);
-    if (!res.ok) { showError(res.reason || ''); return; }
-    map.closePopup();
-  });
+    if (result === null) return;
+    const trimmed = result.trim().slice(0, 60);
+    if (!trimmed) { showError('You must record a result.'); return; }
 
-  const failBtn = content.querySelector('#fail-btn');
-  if (failBtn) failBtn.addEventListener('click', async () => {
-    const ok = window.confirm(
-      '❌ Record a failed control challenge at ' + area.name + '?\n\n' +
-      'Your team will NOT be able to attempt this control challenge again.\n' +
-      'The area stays claimed by you, but other teams can steal it.'
-    );
-    if (!ok) return;
-    const res = await failControl(key, myTeam, expected);
+    const res = await claimArea(key, myTeam, expected, trimmed);
     if (!res.ok) { showError(res.reason || ''); return; }
     map.closePopup();
   });
 
   // ── Admin: reset area ──────────────────────────────────────────
-  if (getMyTeam() === null) {
+  if (isAdmin) {
     const adminDiv = document.createElement('div');
     adminDiv.innerHTML =
       '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #eee;">' +
@@ -370,9 +383,20 @@ function finishEditorArea() {
   const name = window.prompt('Name for this area?');
   if (!name) return;
 
+  // Grid position drives the 4-in-a-row win condition
+  const gridRaw = window.prompt(
+    'Grid position for the 4-in-a-row win, as "row,col"\n' +
+    '(row 0 = southernmost row, col 0 = westernmost column):'
+  ) || '';
+  const gridMatch = gridRaw.match(/(\d+)\s*,\s*(\d+)/);
+  const gridLine  = gridMatch
+    ? '    row: ' + gridMatch[1] + ', col: ' + gridMatch[2] + ',\n'
+    : '    row: 0, col: 0, // ⚠️ TODO: set the grid position\n';
+
   const snippet =
     '  {\n' +
     '    name: "' + name.replace(/"/g, '\\"') + '",\n' +
+    gridLine +
     '    polygon: [\n' +
     editorPoints.map(p => '      [' + p[0] + ', ' + p[1] + '],').join('\n') + '\n' +
     '    ],\n' +

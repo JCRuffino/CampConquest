@@ -5,6 +5,9 @@ export const states = [
   { label: "Team C",    color: "#2a9d3f" },
 ];
 
+// How many areas in a straight line win the game
+export const WIN_LENGTH = 4;
+
 // Escape user-supplied strings before inserting into innerHTML
 export function esc(s) {
   return String(s == null ? '' : s)
@@ -45,7 +48,7 @@ export function normalizeGameCode(s) {
 }
 
 // Areas merged from areas.js geometry + challenges.csv text:
-// { name, polygon, initialChallenge, controlChallenge }
+// { name, polygon, row, col, challenge }
 export const allAreas  = [];
 export const gameState = { data: null };
 
@@ -63,16 +66,83 @@ export function findArea(key) {
   return allAreas.find(a => toKey(a.name) === key) || null;
 }
 
-// ── GAME TIMER ────────────────────────────────────────────────────
+// ── SCOUTING ──────────────────────────────────────────────────────
+// A team only sees an area's challenge once one of its players has
+// been there (gs.visited[team][key] = true)
+export function isVisited(gs, team, key) {
+  return !!(gs && gs.visited && gs.visited[team] && gs.visited[team][key]);
+}
+
+// Ray-casting point-in-polygon; polygon is [[lat, lng], …]
+export function pointInPolygon(lat, lng, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [yi, xi] = polygon[i];
+    const [yj, xj] = polygon[j];
+    if (((yi > lat) !== (yj > lat)) &&
+        (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+// ── WIN CONDITION ─────────────────────────────────────────────────
+// First team with WIN_LENGTH owned areas in a straight line (using the
+// row/col grid positions from areas.js) wins — locked or not.
+// Returns [key, key, …] of the winning line, or null.
+export function findWinningLine(gs, team) {
+  const cells = {};
+  allAreas.forEach(a => {
+    if (a.row == null || a.col == null) return;
+    const key = toKey(a.name);
+    const st  = gs.areas && gs.areas[key];
+    if (st && st.owner === team) cells[a.row + ',' + a.col] = key;
+  });
+
+  const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+  for (const start of Object.keys(cells)) {
+    const [r, c] = start.split(',').map(Number);
+    for (const [dr, dc] of dirs) {
+      const line = [];
+      for (let i = 0; i < WIN_LENGTH; i++) {
+        const k = cells[(r + dr * i) + ',' + (c + dc * i)];
+        if (!k) break;
+        line.push(k);
+      }
+      if (line.length === WIN_LENGTH) return line;
+    }
+  }
+  return null;
+}
+
+// Check every team — used after admin corrections to set or clear the
+// recorded winner
+export function findAnyWinner(gs) {
+  for (const t of [1, 2, 3]) {
+    const line = findWinningLine(gs, t);
+    if (line) return { team: t, line };
+  }
+  return null;
+}
+
+// ── GAME TIMER / GAME OVER ────────────────────────────────────────
 export function isGameOver(gs) {
-  return !!(gs && gs.timer && gs.timer.endsAt && Date.now() >= gs.timer.endsAt);
+  if (!gs) return false;
+  if (gs.winner) return true;
+  return !!(gs.timer && gs.timer.endsAt && Date.now() >= gs.timer.endsAt);
 }
 
 // Returns true (and tells the player) when the game is over — call at the
-// top of any claim/lock action to soft-block it after the countdown
+// top of any claim/steal action to soft-block it
 export function gameOverGuard(gs) {
   if (!isGameOver(gs)) return false;
-  window.alert('⏱️ The game has ended!\n\nNo more areas can be claimed or locked.\nCheck the leaderboard for the final standings.');
+  if (gs.winner) {
+    window.alert('🏆 The game is over — ' + teamName(gs, gs.winner.team) +
+      ' got ' + WIN_LENGTH + ' areas in a row!');
+  } else {
+    window.alert('⏱️ The game has ended!\n\nNo more areas can be claimed or stolen.\nCheck the leaderboard for the final standings.');
+  }
   return true;
 }
 
@@ -85,12 +155,13 @@ export function formatCountdown(ms) {
   return h > 0 ? h + ':' + pad(m) + ':' + pad(sec) : m + ':' + pad(sec);
 }
 
-// Firebase stores empty arrays as missing keys — restore them so the
-// rest of the code can assume they exist
+// Firebase strips empty objects — restore the containers the rest of
+// the code assumes exist
 export function fixArrays(gs) {
-  Object.values(gs.areas || {}).forEach(a => {
-    if (!a.failedControl) a.failedControl = [];
-    else if (!Array.isArray(a.failedControl)) a.failedControl = Object.values(a.failedControl);
+  if (!gs.areas) gs.areas = {};
+  if (!gs.visited) gs.visited = {};
+  [1, 2, 3].forEach(t => {
+    if (!gs.visited[t]) gs.visited[t] = {};
   });
 }
 
