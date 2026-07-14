@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Camp Conquest</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    /* ── RESET & BASE ───────────────────────────────────────────── */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #111; }
+
+    /* ── NAV BAR ────────────────────────────────────────────────── */
+    #nav-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 60px;
+      background: white;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      z-index: 9000;
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+    }
+    .nav-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 600;
+      color: #9ca3af;
+      background: none;
+      border: none;
+      cursor: pointer;
+      gap: 2px;
+      padding: 0 2px;
+      transition: color 0.15s;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .nav-btn .nav-icon {
+      font-size: 20px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .nav-btn span:not(.nav-icon) {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+      text-align: center;
+    }
+    .nav-btn.active { color: #1d6fd1; }
+
+    /* ── RULES ACCORDION ────────────────────────────────────────── */
+    .rules-card {
+      background: white;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+      border: 1px solid #e5e7eb;
+    }
+    .accordion-item {
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .accordion-item:last-child {
+      border-bottom: none;
+    }
+    .accordion-btn {
+      width: 100%;
+      background: none;
+      border: none;
+      padding: 14px 16px;
+      text-align: left;
+      font-size: 14px;
+      font-weight: 700;
+      color: #111;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    .accordion-btn:hover { background: #f9fafb; }
+    .accordion-btn::after {
+      content: '›';
+      font-size: 18px;
+      color: #9ca3af;
+      transition: transform 0.2s;
+      transform: rotate(90deg);
+    }
+    .accordion-btn.open::after {
+      transform: rotate(270deg);
+    }
+    .accordion-body {
+      display: none;
+      padding: 0 16px 14px 16px;
+      font-size: 13px;
+      color: #6b7280;
+      line-height: 1.6;
+    }
+    .accordion-body.open { display: block; }
+    .accordion-body p { margin-bottom: 8px; }
+    .accordion-body p:last-child { margin-bottom: 0; }
+
+    /* ── SCREENS ────────────────────────────────────────────────── */
+    .screen {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      bottom: 60px;
+      overflow-y: auto;
+    }
+    .screen.active { display: block; }
+    #screen-map { overflow: hidden; }
+    #map { width: 100%; height: 100%; }
+    #screen-areas { padding: 14px; background: #f0f2f5; }
+    #screen-areas .areas-container { max-width: 480px; margin: 0 auto; }
+    #screen-leaderboard { padding: 14px; background: #f0f2f5; }
+    #screen-settings { padding: 0; background: #f0f2f5; }
+
+    /* ── MAP SCOREBOARD ─────────────────────────────────────────── */
+    #map-scoreboard {
+      position: absolute;
+      bottom: 28px; right: 10px;
+      z-index: 1000;
+      background: white;
+      border-radius: 20px;
+      padding: 6px 12px;
+      display: flex;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 800;
+      color: #111;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      pointer-events: none;
+    }
+
+    /* ── AREA LABELS (polygon names) ────────────────────────────── */
+    .area-label {
+      background: none;
+      border: none;
+      box-shadow: none;
+      font-size: 11px;
+      font-weight: 800;
+      color: #111827;
+      text-shadow: 0 0 3px white, 0 0 3px white, 0 0 3px white, 0 0 3px white;
+      pointer-events: none;
+    }
+    .area-label::before { display: none; }
+
+    /* ── AREA EDITOR CONTROL ────────────────────────────────────── */
+    #editor-control {
+      position: absolute;
+      top: 48px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 1100;
+      background: white;
+      border: 2px solid #f59e0b;
+      border-radius: 12px;
+      padding: 10px 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+
+    /* ── MARKER PULSE (player pins) ─────────────────────────────── */
+    .player-dot {
+      animation: player-pulse 1.8s ease-out infinite;
+    }
+    @keyframes player-pulse {
+      0%   { box-shadow: 0 2px 5px rgba(0,0,0,0.4), 0 0 0 0 var(--pc); }
+      70%  { box-shadow: 0 2px 5px rgba(0,0,0,0.4), 0 0 0 10px transparent; }
+      100% { box-shadow: 0 2px 5px rgba(0,0,0,0.4), 0 0 0 0 transparent; }
+    }
+
+    /* ── COUNTDOWN PILL ─────────────────────────────────────────── */
+    #countdown-pill {
+      position: fixed;
+      top: 10px; left: 50%;
+      transform: translateX(-50%);
+      background: #111827;
+      color: white;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      z-index: 9100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      display: none;
+    }
+    #countdown-pill.ended { background: #e63946; }
+
+    /* ── TOASTS ─────────────────────────────────────────────────── */
+    #toast-container {
+      position: fixed;
+      top: 48px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 9500;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: min(92vw, 360px);
+      pointer-events: none;
+    }
+    .toast {
+      background: white;
+      border-radius: 12px;
+      padding: 10px 14px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+      font-size: 13px;
+      font-weight: 600;
+      color: #111;
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: opacity 0.25s, transform 0.25s;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ── SYNC STATUS ────────────────────────────────────────────── */
+    #sync-status {
+      position: fixed;
+      top: 10px; right: 10px;
+      background: white;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      z-index: 9100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+      color: #6b7280;
+    }
+
+    /* ── SECTION TITLE ──────────────────────────────────────────── */
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin: 0 0 10px 0;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .divider { height: 1px; background: #e5e7eb; margin: 16px 0; }
+
+    /* ── BUTTONS (shared base) ──────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 9px 16px;
+      border: none;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: filter 0.15s, transform 0.1s;
+      color: white;
+      line-height: 1;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; filter: none; transform: none; }
+    .btn:hover:not(:disabled) { filter: brightness(1.08); }
+    .btn-primary   { background: #1d6fd1; }
+    .btn-danger    { background: #e63946; }
+    .btn-ghost     { background: #f3f4f6; color: #374151; }
+    .btn-ghost:hover:not(:disabled)     { background: #e5e7eb; filter: none; }
+    .btn-amber     { background: #f59e0b; }
+    .btn-success   { background: #2a9d3f; }
+    .btn-neutral   { background: #6b7280; }
+    .btn-full { width: 100%; }
+    .btn-sm { padding: 7px 12px; font-size: 12px; border-radius: 8px; }
+
+    /* ── AREA CARDS ─────────────────────────────────────────────── */
+    .challenge-card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .card-title {
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .card-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      color: white;
+      gap: 3px;
+    }
+    .card-buttons { display: flex; gap: 6px; }
+    .card-buttons .btn { flex: 1; padding: 8px 4px; font-size: 12px; }
+
+    /* ── LEADERBOARD ────────────────────────────────────────────── */
+    .lb-card {
+      background: white;
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+      border: 1px solid #e5e7eb;
+    }
+    .lb-card h3 {
+      margin: 0 0 12px 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: #111;
+    }
+    .lb-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #f3f4f6;
+      font-size: 14px;
+    }
+    .lb-row:last-child { border-bottom: none; }
+    .lb-left { display: flex; align-items: center; gap: 10px; font-weight: 500; }
+    .lb-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+    .lb-value { font-weight: 800; font-size: 17px; color: #111; }
+
+    /* ── SETTINGS ───────────────────────────────────────────────── */
+    .settings-container {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .settings-card {
+      background: white;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+      border: 1px solid #e5e7eb;
+    }
+    .settings-card-danger { border-color: rgba(230,57,70,0.3); }
+    .settings-card-title { font-weight: 700; font-size: 15px; margin-bottom: 3px; color: #111; }
+    .settings-card-desc { font-size: 12px; color: #9ca3af; margin-bottom: 14px; line-height: 1.5; }
+
+    .team-assign-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .team-assign-btn {
+      flex: 1;
+      padding: 9px 4px;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      background: white;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+      color: #374151;
+    }
+    .team-assign-btn:hover:not(:disabled) { border-color: #9ca3af; background: #f9fafb; }
+    .team-assign-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .team-assign-btn.active-a { background: #e63946; color: white; border-color: #e63946; }
+    .team-assign-btn.active-b { background: #1d6fd1; color: white; border-color: #1d6fd1; }
+    .team-assign-btn.active-c { background: #2a9d3f; color: white; border-color: #2a9d3f; }
+
+    .current-team-label { font-size: 12px; color: #6b7280; text-align: center; padding: 4px 0; }
+
+    .team-name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .team-name-row label { width: 55px; font-size: 13px; font-weight: 700; flex-shrink: 0; color: #374151; }
+    .team-name-row input {
+      flex: 1;
+      padding: 8px 10px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s;
+      font-family: inherit;
+    }
+    .team-name-row input:focus { border-color: #1d6fd1; box-shadow: 0 0 0 3px rgba(29,111,209,0.1); }
+
+    .reset-blocked-msg { margin-top: 10px; font-size: 12px; color: #e63946; text-align: center; font-weight: 600; }
+
+    /* ── MODALS ─────────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      min-width: 280px;
+      max-width: 340px;
+      width: 90%;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+    }
+    .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; color: #111; }
+
+    /* ── POPUP (map area) ───────────────────────────────────────── */
+    .popup-box { font-family: inherit; font-size: 14px; min-width: 210px; }
+    .popup-box strong { display: block; margin-bottom: 4px; font-size: 15px; font-weight: 700; }
+    .popup-box .popup-sub { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+    .popup-box select {
+      width: 100%; padding: 7px 8px;
+      border: 1px solid #e5e7eb; border-radius: 8px;
+      font-size: 13px; font-family: inherit;
+      outline: none;
+    }
+    .popup-box select:focus { border-color: #1d6fd1; }
+    .popup-box .error-msg { color: #e63946; font-size: 12px; margin-top: 6px; display: none; font-weight: 600; }
+    .error-msg { color: #e63946; font-size: 12px; margin-top: 6px; display: none; font-weight: 600; }
+  </style>
+</head>
+
+<body>
+
+  <div id="sync-status">🔄 Connecting...</div>
+  <div id="countdown-pill"></div>
+  <div id="toast-container"></div>
+
+  <!-- MAP -->
+  <div id="screen-map" class="screen active">
+    <div id="map"></div>
+    <div id="map-scoreboard"></div>
+  </div>
+
+  <!-- AREAS -->
+  <div id="screen-areas" class="screen">
+    <div class="areas-container">
+      <div class="section-title">🏕️ Campsite Areas</div>
+      <div id="areas-list"></div>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div id="screen-leaderboard" class="screen">
+    <div style="padding: 14px; max-width: 400px; margin: 0 auto;">
+
+      <div class="lb-card">
+        <h3>🏕️ Areas Controlled</h3>
+        <div style="font-size:11px;color:#9ca3af;margin:-8px 0 10px;">
+          🔒 = locked areas (can't be stolen; tiebreaker)
+        </div>
+        <div id="leaderboard-rows"></div>
+      </div>
+
+      <div class="lb-card">
+        <h3>🗺️ Territory Breakdown</h3>
+        <div id="lb-area-breakdown"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="screen" id="screen-settings">
+    <div class="settings-container">
+
+      <div class="settings-card">
+        <div class="settings-card-title">👤 Your Team</div>
+        <div class="settings-card-desc">Choose a team!</div>
+        <div class="team-assign-buttons">
+          <button class="team-assign-btn" data-team="1">Join Team A</button>
+          <button class="team-assign-btn" data-team="2">Join Team B</button>
+          <button class="team-assign-btn" data-team="3">Join Team C</button>
+        </div>
+        <div id="current-team-label" class="current-team-label">No team assigned</div>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-card-title">✏️ Team Names</div>
+        <div class="settings-card-desc">Rename teams (max 12 characters).</div>
+        <div class="team-name-row">
+          <label>Team A</label>
+          <input type="text" id="name-input-1" maxlength="12" placeholder="Team A" />
+          <button class="btn btn-primary btn-sm btn-save-name" data-team="1">Apply</button>
+        </div>
+        <div class="team-name-row">
+          <label>Team B</label>
+          <input type="text" id="name-input-2" maxlength="12" placeholder="Team B" />
+          <button class="btn btn-primary btn-sm btn-save-name" data-team="2">Apply</button>
+        </div>
+        <div class="team-name-row">
+          <label>Team C</label>
+          <input type="text" id="name-input-3" maxlength="12" placeholder="Team C" />
+          <button class="btn btn-primary btn-sm btn-save-name" data-team="3">Apply</button>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-card-title">⏱️ Game Timer</div>
+        <div class="settings-card-desc">Set a countdown for the game. When it hits zero the game ends — no more claims or locks.</div>
+        <div id="timer-status" style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px;">No countdown set.</div>
+        <div id="timer-start-row" style="display:flex;gap:8px;">
+          <input id="timer-minutes" type="number" min="1" placeholder="Minutes"
+            style="flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;outline:none;" />
+          <button id="timer-start-btn" class="btn btn-primary">Start</button>
+        </div>
+        <div id="timer-adjust-row" style="display:none;flex-wrap:wrap;gap:6px;margin-top:8px;">
+          <button id="timer-plus-btn" class="btn btn-ghost btn-sm">＋5 min</button>
+          <button id="timer-minus-btn" class="btn btn-ghost btn-sm">－5 min</button>
+          <button id="timer-endnow-btn" class="btn btn-amber btn-sm">End now</button>
+          <button id="timer-cancel-btn" class="btn btn-danger btn-sm">Cancel</button>
+        </div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:8px;">Only an admin (no team assigned) can adjust or cancel a running countdown.</div>
+      </div>
+
+      <div class="settings-card" id="editor-card" style="display:none;">
+        <div class="settings-card-title">✏️ Area Editor (Admin)</div>
+        <div class="settings-card-desc">
+          Trace the real campsite areas: start the editor, tap the corners of an area on
+          the map, then press Finish. The snippet to paste into <strong>areas.js</strong>
+          appears below and is copied to the clipboard.
+        </div>
+        <button id="editor-toggle-btn" class="btn btn-amber btn-full">✏️ Start Area Editor</button>
+        <div style="display:none;margin-top:10px;">
+          <textarea id="editor-output" readonly
+            style="width:100%;height:140px;padding:8px;border:1px solid #e5e7eb;border-radius:8px;
+                   font-size:11px;font-family:monospace;outline:none;resize:vertical;"></textarea>
+        </div>
+      </div>
+
+      <div class="settings-card settings-card-danger">
+        <div class="settings-card-title">🔴 Reset Game</div>
+        <div class="settings-card-desc">Full reset to start a new game — all areas back to unclaimed.</div>
+        <button id="reset-btn" class="btn btn-danger btn-full">Reset Game</button>
+        <div id="reset-blocked-msg" class="reset-blocked-msg" style="display:none;">
+          ⚠️ Unassign yourself before resetting.
+        </div>
+      </div>
+
+      <div id="reset-overlay" class="modal-overlay">
+        <div class="modal-box">
+          <div class="modal-title">⚠️ Reset Game?</div>
+          <p style="font-size:13px;color:#6b7280;margin:6px 0 16px;line-height:1.5;">
+            This resets every area to unclaimed and clears the history. Enter the password to confirm.
+          </p>
+          <input
+            id="reset-password-input"
+            type="password"
+            placeholder="Enter password"
+            style="width:100%;padding:9px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;margin-bottom:6px;outline:none;font-family:inherit;transition:border-color 0.15s;"
+          />
+          <div id="reset-password-error" style="font-size:12px;color:#e63946;font-weight:600;margin-bottom:12px;display:none;">
+            ❌ Incorrect password
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button id="reset-confirm-btn" class="btn btn-danger" style="flex:1;">Yes, Reset</button>
+            <button id="reset-cancel-btn" class="btn btn-ghost" style="flex:1;">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RULES -->
+  <div id="screen-rules" class="screen">
+    <div style="padding: 14px; max-width: 400px; margin: 0 auto;">
+
+      <div class="rules-card">
+
+        <div class="accordion-item">
+          <button class="accordion-btn">🎯 Objective</button>
+          <div class="accordion-body">
+            <p>Take control of areas of the campsite. When the game timer runs out, the team controlling the most areas wins. If teams are tied, the team with more <strong>locked</strong> areas wins.</p>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <button class="accordion-btn">⛺ Claiming Areas</button>
+          <div class="accordion-body">
+            <p>Every area has an <strong>initial challenge</strong>. Go to the area, complete its initial challenge as a team, then tap the area on the map and press Claim. It turns your team's colour and counts towards your score.</p>
+            <p>Teams are on their honour — only press Claim when you've genuinely completed the challenge!</p>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <button class="accordion-btn">🔒 Locking Areas</button>
+          <div class="accordion-body">
+            <p>Once you control an area you unlock its <strong>control challenge</strong>. Complete it to lock the area in — a locked area is yours for the rest of the game and can never be stolen.</p>
+            <p>But be careful: if you attempt the control challenge and <strong>fail</strong>, your team can never attempt that area's control challenge again. The area stays yours, but it remains open for other teams to steal.</p>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <button class="accordion-btn">😈 Stealing Areas</button>
+          <div class="accordion-body">
+            <p>Any area that is claimed but <strong>not locked</strong> can be stolen. Complete the area's initial challenge and press Steal — ownership transfers to your team.</p>
+            <p>After stealing, you can attempt the control challenge to lock it (unless your team already failed that area's control challenge earlier).</p>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <button class="accordion-btn">👥 Teams</button>
+          <div class="accordion-body">
+            <p>Three teams of two players. Join your team in Settings — your live location is then shared on the map so everyone can see where the action is.</p>
+            <p>Anyone with no team assigned is a spectator/admin: they can adjust the timer, fix mistakes on any area, and reset the game.</p>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <button class="accordion-btn">🏆 Winning</button>
+          <div class="accordion-body">
+            <p>The game ends when the countdown hits zero. Most areas controlled wins; most locked areas breaks a tie. Locked and unlocked areas are otherwise worth the same.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div id="screen-history" class="screen">
+    <div style="padding:14px;max-width:480px;margin:0 auto;">
+
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <select id="history-filter-team"
+          style="flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px;
+                 font-size:13px;font-family:inherit;outline:none;background:white;">
+          <option value="all">All Teams</option>
+          <option value="1">Team A</option>
+          <option value="2">Team B</option>
+          <option value="3">Team C</option>
+        </select>
+        <select id="history-filter-type"
+          style="flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px;
+                 font-size:13px;font-family:inherit;outline:none;background:white;">
+          <option value="all">All Types</option>
+          <option value="area">⛺ Claims &amp; Steals</option>
+          <option value="lock">🔒 Locks</option>
+          <option value="timer">⏱️ Timer</option>
+        </select>
+      </div>
+
+      <div id="history-list">
+        <span style="font-size:13px;color:#9ca3af;font-style:italic;">
+          No entries yet.
+        </span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- NAV -->
+  <div id="nav-bar">
+    <button class="nav-btn active" data-screen="map">
+      <span class="nav-icon">🗺️</span>Map
+    </button>
+    <button class="nav-btn" data-screen="areas">
+      <span class="nav-icon">🏕️</span>Areas
+    </button>
+    <button class="nav-btn" data-screen="leaderboard">
+      <span class="nav-icon">🏆</span>Leaderboard
+    </button>
+    <button class="nav-btn" data-screen="settings">
+      <span class="nav-icon">⚙️</span>Settings
+    </button>
+    <button class="nav-btn" data-screen="rules">
+      <span class="nav-icon">📖</span>Rules
+    </button>
+    <button class="nav-btn" data-screen="history">
+      <span class="nav-icon">📜</span>History
+    </button>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="main.js"></script>
+
+</body>
+</html>
