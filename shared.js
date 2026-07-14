@@ -142,16 +142,39 @@ export function largestCluster(gs, team) {
   return best;
 }
 
+// ── MAJORITY WIN ──────────────────────────────────────────────────
+// A team that ever controls MORE THAN HALF of all areas (locked or
+// not) wins on the spot. Returns { team, count, total } or null.
+export function majorityWinner(gs) {
+  const counts = { 1: 0, 2: 0, 3: 0 };
+  let total = 0;
+  Object.values(gs.areas || {}).forEach(a => {
+    total++;
+    if (a.owner) counts[a.owner]++;
+  });
+  for (const t of [1, 2, 3]) {
+    if (counts[t] > total / 2) return { team: t, count: counts[t], total };
+  }
+  return null;
+}
+
 // ── GAME TIMER / GAME OVER ────────────────────────────────────────
 export function isGameOver(gs) {
-  return !!(gs && gs.timer && gs.timer.endsAt && Date.now() >= gs.timer.endsAt);
+  if (!gs) return false;
+  if (gs.winner) return true;
+  return !!(gs.timer && gs.timer.endsAt && Date.now() >= gs.timer.endsAt);
 }
 
 // Returns true (and tells the player) when the game is over — call at the
 // top of any claim/steal action to soft-block it
 export function gameOverGuard(gs) {
   if (!isGameOver(gs)) return false;
-  window.alert('⏱️ The game has ended!\n\nNo more areas can be claimed or stolen.\nCheck the leaderboard for the final standings.');
+  if (gs.winner) {
+    window.alert('🏆 The game is over — ' + teamName(gs, gs.winner.team) +
+      ' took control of the majority of the campsite!');
+  } else {
+    window.alert('⏱️ The game has ended!\n\nNo more areas can be claimed or stolen.\nCheck the leaderboard for the final standings.');
+  }
   return true;
 }
 

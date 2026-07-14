@@ -232,12 +232,17 @@ function handleAreaClick(area, latlng) {
       (a.failedBy || []).map(t => esc(teamName(gs, t))).join(', ') + '</div>';
   }
 
+  if (a.contestedBy && !a.locked) {
+    body += '<div style="font-size:12px;color:#e63946;font-weight:700;margin-top:6px;">' +
+      '⚔️ ' + esc(teamName(gs, a.contestedBy)) + ' is contesting this area — win or lose, it locks!</div>';
+  }
+
   if (a.locked) {
     body += '<div style="font-size:12px;color:#6b7280;margin-top:8px;">' +
-      'This area was stolen and is locked in for the rest of the game.</div>';
+      'This area is locked in for the rest of the game.</div>';
   } else if (isMine) {
     body += '<div style="font-size:12px;color:#6b7280;margin-top:8px;">' +
-      'Your area — another team can steal it (and lock it) by beating your result.</div>';
+      'Your area — another team can steal it (and lock it) by beating your result. If their steal fails, it locks for you.</div>';
   } else if (myTeam === null) {
     if (!admin) {
       body += '<div style="font-size:12px;color:#9ca3af;margin-top:8px;">Join a team in Settings to play.</div>';
@@ -245,21 +250,19 @@ function handleAreaClick(area, latlng) {
   } else if (iFailed) {
     body += '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
       '❌ Your team failed this challenge — you can\'t attempt it again until another team passes it.</div>';
+  } else if (a.contestedBy && a.contestedBy !== myTeam) {
+    body += '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
+      '🚫 Too late — ' + esc(teamName(gs, a.contestedBy)) + ' got here first. Only one team can contest a claimed area.</div>';
   } else if (!attempt) {
-    // Not started yet — starting reveals the challenge and commits the team
-    const timerNote = area.timer
-      ? (area.timer.mode === 'down'
-        ? '⏱️ This challenge has a ' + area.timer.minutes + '-minute countdown.'
-        : '⏱️ This challenge is against the clock (counts up).')
-      : '';
-    body += timerNote
-      ? '<div style="font-size:12px;color:#374151;font-weight:600;margin-top:8px;">' + timerNote + '</div>'
-      : '';
+    // Not started yet — starting reveals the challenge (and any timer,
+    // which begins immediately: no warning, that's the fun) and commits
+    // the team to a pass or a fail
     actionsHTML =
       '<button id="start-btn" class="btn btn-full" style="margin-top:10px;background:' +
       states[myTeam].color + ';">▶️ Start Challenge Attempt</button>' +
       '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center;">' +
         'Starting reveals the challenge and commits your team to a pass or a fail.' +
+        (isUnclaimed ? '' : ' Stealing shuts the other team out — win or lose, this area locks.') +
       '</div>';
   } else {
     // Attempt in progress — show the timer (if any) and resolve buttons
@@ -362,7 +365,9 @@ function handleAreaClick(area, latlng) {
   if (failBtn) failBtn.addEventListener('click', async () => {
     const ok = window.confirm(
       '❌ Record a FAILED attempt at ' + area.name + '?\n\n' +
-      'Your team won\'t be able to attempt this challenge again until another team passes it.'
+      (isUnclaimed
+        ? 'Your team won\'t be able to attempt this challenge again until another team passes it.'
+        : 'The steal has failed — the area LOCKS permanently for ' + teamName(gs, a.owner) + '!')
     );
     if (!ok) return;
     const res = await failChallenge(key, myTeam, expected);

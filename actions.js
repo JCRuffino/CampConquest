@@ -6,7 +6,7 @@
 // silently overwriting.
 
 import { mutateState, pushLog } from './firebase.js';
-import { gameState, teamName, gameOverGuard, largestCluster } from './shared.js';
+import { gameState, teamName, gameOverGuard, largestCluster, majorityWinner } from './shared.js';
 
 // Complete the challenge → claim an unclaimed area, recording the result
 // other teams will have to beat. Stealing (owner !== 0) locks the area.
@@ -17,10 +17,15 @@ export async function claimArea(key, team, expected, result) {
   let wasSteal   = false;
   let prevOwner  = 0;
   let prevResult = '';
+  let winInfo    = null;
 
   const committed = await mutateState(gs => {
     const a = gs.areas && gs.areas[key];
     if (!a) return;
+    if (gs.winner) {
+      failReason = 'The game is already won!';
+      return;
+    }
     if (a.owner !== expected.owner || !!a.locked !== !!expected.locked) {
       failReason = 'This area just changed — reopen it to see the latest state.';
       return;
@@ -44,6 +49,11 @@ export async function claimArea(key, team, expected, result) {
     a.result   = result;
     a.locked   = wasSteal; // a stolen area locks permanently
     a.failedBy = [];       // a pass clears everyone's lockouts
+    delete a.contestedBy;
+
+    // Controlling more than half the areas wins immediately
+    winInfo = majorityWinner(gs);
+    if (winInfo) gs.winner = { team: winInfo.team, at: Date.now() };
     return gs;
   });
 
@@ -69,6 +79,18 @@ export async function claimArea(key, team, expected, result) {
       message: '⛺ ' + teamName(gs, team) + ' claimed ' + name + ' with a result of "' + result + '"',
     });
   }
+  if (winInfo) {
+    pushLog({
+      timestamp: Date.now(),
+      team,
+      type: 'timer',
+      big:  true,
+      message: '🏆 ' + teamName(gs, team) + ' controls ' + winInfo.count + ' of ' +
+               winInfo.total + ' areas — a MAJORITY. THEY WIN THE GAME!',
+    });
+    return { ok: true };
+  }
+
   // A claim/steal that grows a team's biggest connected group is worth
   // shouting about
   const cluster = largestCluster(gs, team);
@@ -85,13 +107,16 @@ export async function claimArea(key, team, expected, result) {
   return { ok: true };
 }
 
-// Record a failed challenge attempt: the team is locked out of this
-// area's challenge until another team passes it (claim or steal, which
-// clears failedBy)
+// Record a failed challenge attempt.
+// On an UNCLAIMED area: the team is locked out until another team
+// passes the challenge (claim/steal clears failedBy).
+// On a CLAIMED area (a steal attempt): the duel is over — the area
+// LOCKS for the original owner.
 export async function failChallenge(key, team, expected) {
   if (gameOverGuard(gameState.data)) return { ok: false };
 
   let failReason = '';
+  let lockedForOwner = 0;
 
   const committed = await mutateState(gs => {
     const a = gs.areas && gs.areas[key];
@@ -103,6 +128,13 @@ export async function failChallenge(key, team, expected) {
     if (a.locked || a.owner === team) {
       failReason = 'Nothing to fail here.';
       return;
+    }
+    if (a.owner !== 0) {
+      // failed steal → the owner keeps the area permanently
+      a.locked = true;
+      delete a.contestedBy;
+      lockedForOwner = a.owner;
+      return gs;
     }
     if (!Array.isArray(a.failedBy)) a.failedBy = [];
     if (a.failedBy.includes(team)) {
@@ -117,13 +149,24 @@ export async function failChallenge(key, team, expected) {
 
   const gs = gameState.data;
   const name = (gs.areas[key] && gs.areas[key].displayName) || key;
-  pushLog({
-    timestamp: Date.now(),
-    team,
-    type: 'attempt',
-    message: '❌ ' + teamName(gs, team) + ' failed the challenge at ' + name +
-             ' — locked out until another team passes it',
-  });
+  if (lockedForOwner) {
+    pushLog({
+      timestamp: Date.now(),
+      team,
+      type: 'attempt',
+      big:  true,
+      message: '🛡️ ' + teamName(gs, team) + ' failed to steal ' + name + ' — it is now LOCKED for ' +
+               teamName(gs, lockedForOwner) + '!',
+    });
+  } else {
+    pushLog({
+      timestamp: Date.now(),
+      team,
+      type: 'attempt',
+      message: '❌ ' + teamName(gs, team) + ' failed the challenge at ' + name +
+               ' — locked out until another team passes it',
+    });
+  }
   return { ok: true };
 }
 
@@ -154,6 +197,16 @@ export async function startAttempt(key, team, expected) {
       failReason = 'Your team failed this challenge — you can\'t attempt it again until another team passes it.';
       return;
     }
+    // A claimed area can only be contested by ONE rival team: the first
+    // to start a steal attempt shuts the third team out, and the duel
+    // ends with the area locked either way
+    if (a.owner !== 0) {
+      if (a.contestedBy && a.contestedBy !== team) {
+        failReason = 'Too late — another team is already contesting this area.';
+        return;
+      }
+      a.contestedBy = team;
+    }
     if (!gs.attempts) gs.attempts = {};
     if (!gs.attempts[team]) gs.attempts[team] = {};
     gs.attempts[team][key] = { startedAt: Date.now() };
@@ -163,12 +216,18 @@ export async function startAttempt(key, team, expected) {
   if (!committed) return { ok: false, reason: failReason || 'Could not start — please try again.' };
 
   const gs = gameState.data;
-  const name = (gs.areas[key] && gs.areas[key].displayName) || key;
+  const a  = gs.areas[key] || {};
+  const name = a.displayName || key;
+  const isContest = expected.owner !== 0;
   pushLog({
     timestamp: Date.now(),
     team,
     type: 'attempt',
-    message: '▶️ ' + teamName(gs, team) + ' started the challenge at ' + name,
+    big:  isContest,
+    message: isContest
+      ? '⚔️ ' + teamName(gs, team) + ' is trying to STEAL ' + name + ' from ' +
+        teamName(gs, expected.owner) + ' — win or lose, it locks!'
+      : '▶️ ' + teamName(gs, team) + ' started the challenge at ' + name,
   });
   return { ok: true };
 }
@@ -176,6 +235,8 @@ export async function startAttempt(key, team, expected) {
 // Admin: set an area to any state — ownership, lock, the current result
 // to beat, and a pass-mark override (replaces the challenges.csv value)
 export async function adminSetArea(key, fields) {
+  let winnerChange = null;
+
   const committed = await mutateState(gs => {
     const a = gs.areas && gs.areas[key];
     if (!a) return;
@@ -184,7 +245,19 @@ export async function adminSetArea(key, fields) {
     a.locked   = fields.owner === 0 ? false : !!fields.locked;
     a.result   = fields.owner === 0 ? '' : (fields.result || '');
     a.passMark = fields.passMark || '';
-    if (clearFails) a.failedBy = [];
+    if (clearFails) {
+      a.failedBy = [];
+      delete a.contestedBy;
+    }
+
+    // Recompute the majority win, so a mistaken claim that "won" the
+    // game can be undone (or a correction can trigger the win)
+    const hadWinner = gs.winner ? gs.winner.team : null;
+    const now       = majorityWinner(gs);
+    if (now) gs.winner = { team: now.team, at: (gs.winner && gs.winner.at) || Date.now() };
+    else if (gs.winner) delete gs.winner;
+    const hasWinner = now ? now.team : null;
+    if (hadWinner !== hasWinner) winnerChange = { to: hasWinner };
     return gs;
   });
 
@@ -199,5 +272,16 @@ export async function adminSetArea(key, fields) {
     message: '⚙️ Admin set ' + name + ' → ' + teamName(gs, fields.owner) +
              (fields.owner !== 0 && fields.locked ? ' (locked)' : ''),
   });
+  if (winnerChange) {
+    pushLog({
+      timestamp: Date.now(),
+      team: 0,
+      type: 'timer',
+      big:  true,
+      message: winnerChange.to
+        ? '🏆 After the admin correction, ' + teamName(gs, winnerChange.to) + ' holds a majority and WINS!'
+        : '⚙️ Admin correction: the previous win no longer stands — the game is back on!',
+    });
+  }
   return { ok: true };
 }

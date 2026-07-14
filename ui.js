@@ -28,6 +28,18 @@ function updateLeaderboard(gs) {
   const { counts, locked, cluster } = getScores(gs);
   const sorted = rankTeams(gs);
 
+  const winnerEl = document.getElementById('lb-winner-banner');
+  if (winnerEl) {
+    if (gs.winner) {
+      winnerEl.style.display = 'block';
+      winnerEl.style.background = states[gs.winner.team].color;
+      winnerEl.textContent = '🏆 ' + teamName(gs, gs.winner.team) +
+        ' controls the majority of the campsite and WINS!';
+    } else {
+      winnerEl.style.display = 'none';
+    }
+  }
+
   const lbEl = document.getElementById('leaderboard-rows');
   if (!lbEl) return;
 

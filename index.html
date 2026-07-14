@@ -441,6 +441,10 @@
   <div id="screen-leaderboard" class="screen">
     <div style="padding: 14px; max-width: 400px; margin: 0 auto;">
 
+      <div id="lb-winner-banner" style="display:none;color:white;border-radius:14px;
+        padding:16px;margin-bottom:12px;text-align:center;font-size:16px;font-weight:800;
+        box-shadow:0 2px 10px rgba(0,0,0,0.2);"></div>
+
       <div class="lb-card">
         <h3>🔗 Largest Connected Group</h3>
         <div style="font-size:11px;color:#9ca3af;margin:-8px 0 10px;">
@@ -574,6 +578,7 @@
           <button class="accordion-btn">🎯 Objective</button>
           <div class="accordion-body">
             <p>Build the biggest <strong>connected group</strong> of areas. Areas that touch each other count as next to each other; areas separated by a hatched grey gap do not. Your score is the size of your largest group of linked areas, and the team with the biggest group when the countdown ends wins.</p>
+            <p><strong>Instant win:</strong> if a team ever controls <strong>more than half of all areas</strong> — locked or not — the game ends immediately and they win.</p>
             <p>Both locked and unlocked areas count. Ties are broken by total areas controlled, then by locked areas.</p>
           </div>
         </div>
@@ -582,7 +587,7 @@
           <button class="accordion-btn">▶️ Starting a Challenge</button>
           <div class="accordion-body">
             <p>Every area's challenge is <strong>secret</strong> until your team presses <strong>Start Challenge Attempt</strong> at that area. Starting reveals the challenge — and commits your team: you must then record either a pass or a fail.</p>
-            <p>Some challenges are timed. A countdown challenge gives you a fixed window (e.g. 5 or 10 minutes) from the moment you press Start; a count-up challenge races the clock, and your time is your result. The live timer shows in the area's popup on everyone's phone.</p>
+            <p>Some challenges are timed — and you won't know until you start! A countdown challenge gives you a fixed window that starts the moment you press Start; a count-up challenge races the clock, and your time is your result. The live timer shows in the area's popup on everyone's phone.</p>
             <p>Only press Start when your team is actually at the area and ready to go.</p>
           </div>
         </div>
@@ -599,8 +604,9 @@
         <div class="accordion-item">
           <button class="accordion-btn">😈 Stealing &amp; Locking</button>
           <div class="accordion-body">
-            <p>Any claimed-but-unlocked area (shown <strong>hatched</strong> on the map) can be stolen: go there, attempt the <strong>same challenge</strong>, and <strong>beat the recorded result</strong>. The area transfers to your team and is <strong>locked</strong> — shown solid on the map, it can never be stolen again.</p>
-            <p>Failing a steal attempt counts as a fail too — you're locked out until another team passes that challenge. So a weak result invites a steal, but every steal permanently settles that area. Choose your battles!</p>
+            <p>Any claimed-but-unlocked area (shown <strong>hatched</strong> on the map) can be stolen: go there, start the <strong>same challenge</strong>, and <strong>beat the recorded result</strong>. The area transfers to your team and is <strong>locked</strong> — shown solid on the map, it can never be stolen again.</p>
+            <p>A steal attempt is a <strong>duel that settles the area forever</strong>: the moment one rival team starts it, the third team is shut out of that area — and if the steal <strong>fails</strong>, the area locks for the original owner instead.</p>
+            <p>So a weak result invites a steal, but every steal attempt permanently settles that area, one way or the other. Choose your battles!</p>
           </div>
         </div>
 
@@ -615,8 +621,8 @@
         <div class="accordion-item">
           <button class="accordion-btn">🏆 Winning</button>
           <div class="accordion-body">
-            <p>When the countdown ends, the team with the <strong>largest connected group</strong> of areas wins — count your biggest cluster of areas joined across the gate lines on the map.</p>
-            <p>Ties are broken by total areas controlled, then by locked areas. A scattered empire loses to a connected one!</p>
+            <p><strong>Instant win:</strong> control more than half of all areas at any moment (locked or not) and the game ends on the spot — the app announces it.</p>
+            <p><strong>Timer win:</strong> when the countdown ends, the team with the <strong>largest connected group</strong> of touching areas wins. Ties are broken by total areas controlled, then by locked areas. A scattered empire loses to a connected one!</p>
           </div>
         </div>
 
