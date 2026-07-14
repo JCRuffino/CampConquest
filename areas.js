@@ -42,9 +42,9 @@ export const siteBoundary = [
 export const connections = [
   ["Main Campfire", "Chapel"],
   ["Main Campfire", "Meadow"],
-  ["Chapel", "Social Deduction Glade"],
+  ["Chapel", "SD Glade"],
   ["Chapel", "RPG Glade"],
-  ["Social Deduction Glade", "Village Square"],
+  ["SD Glade", "Village Square"],
   ["Village Square", "Arena"],
   ["Village Square", "Willows 1"],
   ["Village Square", "Birches 1"],
@@ -76,9 +76,9 @@ export const connections = [
 export const linkSeams = [
   { a: "Main Campfire", b: "Chapel", seam: [[50.860626, 0.23726], [50.860926, 0.237422]] },
   { a: "Main Campfire", b: "Meadow", seam: [[50.860576, 0.23646], [50.860587, 0.237181]] },
-  { a: "Chapel", b: "Social Deduction Glade", seam: [[50.860566, 0.238025], [50.860927, 0.237515]] },
+  { a: "Chapel", b: "SD Glade", seam: [[50.860566, 0.238025], [50.860927, 0.237515]] },
   { a: "Chapel", b: "RPG Glade", seam: [[50.860565, 0.237308], [50.860568, 0.238029]] },
-  { a: "Social Deduction Glade", b: "Village Square", seam: [[50.860573, 0.238198], [50.861508, 0.238388]] },
+  { a: "SD Glade", b: "Village Square", seam: [[50.860573, 0.238198], [50.861508, 0.238388]] },
   { a: "Village Square", b: "Arena", seam: [[50.860572, 0.239121], [50.861524, 0.238719]] },
   { a: "Village Square", b: "Willows 1", seam: [[50.860578, 0.238193], [50.860466, 0.238746]] },
   { a: "Village Square", b: "Birches 1", seam: [[50.860466, 0.238746], [50.860572, 0.239121]] },
@@ -122,7 +122,7 @@ export const areaDefinitions = [
     ],
   },
   {
-    name: "Social Deduction Glade",
+    name: "SD Glade",
     polygon: [
       [50.860927, 0.237515],
       [50.860638, 0.237929],

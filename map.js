@@ -13,6 +13,16 @@ let lastPosition = null;
 const areaLayers    = {};
 const playerMarkers = {};
 
+// Names too wide for their zone break onto two lines, one word per line
+const TWO_LINE_NAMES = new Set(['Main Campfire', 'RPG Glade', 'SD Glade', 'Village Square']);
+
+function labelHTML(name, locked) {
+  const safe = TWO_LINE_NAMES.has(name)
+    ? name.split(' ').map(esc).join('<br>')
+    : esc(name);
+  return (locked ? '🔒 ' : '') + safe;
+}
+
 // ── SITE ILLUSTRATION OVERLAY ─────────────────────────────────────
 // When the nicer hand-drawn site map is ready, drop the image in this
 // folder and set e.g.:
@@ -93,7 +103,7 @@ export function addAreas(areas) {
       interactive: false,
     })
       .setLatLng(polygon.getBounds().getCenter())
-      .setContent(esc(area.name))
+      .setContent(labelHTML(area.name, false))
       .addTo(map);
 
     polygon.on('click', e => {
@@ -163,7 +173,7 @@ export function updateAreaLayers(gs) {
       // setStyle just wrote a solid fill attribute; swap it for the hatch
       layer.polygon._path.setAttribute('fill', 'url(#hatch-' + a.owner + ')');
     }
-    layer.label.setContent((a.locked ? '🔒 ' : '') + esc(layer.area.name));
+    layer.label.setContent(labelHTML(layer.area.name, a.locked));
   });
 }
 
