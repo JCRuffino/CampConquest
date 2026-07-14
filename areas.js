@@ -54,7 +54,7 @@ export const winLines = [
   ["Village Square", "Birches 1", "Birches 3", "Willows 2"],
   ["Willows 2", "Birches 3", "Birches 2", "Beeches"],
   ["Willows 5", "Birches 3", "Oaks 3"],
-  ["Social Deduction Glade", "Willows 1", "Willows 5", "Willows 2"],
+  ["Willows 1", "Willows 5", "Willows 2"],
 ];
 
 export const areaDefinitions = [
