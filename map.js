@@ -546,11 +546,13 @@ function startEditor() {
   editorControl.innerHTML =
     '<div id="editor-hint" style="font-size:12px;font-weight:700;margin-bottom:6px;">✏️ Tap a zone to edit its corners</div>' +
     '<div style="display:flex;gap:6px;justify-content:center;">' +
-      '<button id="editor-copy" class="btn btn-success btn-sm" disabled>📋 Copy Snippet</button>' +
+      '<button id="editor-copy" class="btn btn-success btn-sm" disabled>📋 Copy Zone</button>' +
+      '<button id="editor-copy-all" class="btn btn-primary btn-sm">📋 Copy ALL Zones</button>' +
     '</div>';
   document.getElementById('screen-map').appendChild(editorControl);
 
   editorControl.querySelector('#editor-copy').addEventListener('click', copyEditorSnippet);
+  editorControl.querySelector('#editor-copy-all').addEventListener('click', copyAllZones);
 }
 
 function stopEditor() {
@@ -637,26 +639,40 @@ function buildEditorHandles(layer) {
   });
 }
 
-function copyEditorSnippet() {
-  if (!editorKey) return;
-  const layer = areaLayers[editorKey];
-  const ring  = layer.polygon.getLatLngs()[0];
-  const snippet =
+function zoneSnippet(layer) {
+  const ring = layer.polygon.getLatLngs()[0];
+  return (
     '  {\n' +
     '    name: "' + layer.area.name.replace(/"/g, '\\"') + '",\n' +
     '    polygon: [\n' +
     ring.map(p => '      [' + p.lat.toFixed(6) + ', ' + p.lng.toFixed(6) + '],').join('\n') + '\n' +
     '    ],\n' +
-    '  },\n';
+    '  },\n'
+  );
+}
 
+function sendToOutput(snippet) {
   const out = document.getElementById('editor-output');
   if (out) {
     out.value += snippet;
     out.parentElement.style.display = 'block';
   }
   if (navigator.clipboard) navigator.clipboard.writeText(snippet).catch(() => {});
-  console.log('✏️ Updated area snippet:\n' + snippet);
+  console.log('✏️ Area snippet:\n' + snippet);
+}
+
+function copyEditorSnippet() {
+  if (!editorKey) return;
+  const layer = areaLayers[editorKey];
+  sendToOutput(zoneSnippet(layer));
   window.alert('✅ Updated "' + layer.area.name + '" copied!\n\nPaste it over that area\'s entry in areas.js (also in the box in Settings). The change is only on this device until areas.js is updated.');
+}
+
+// Every zone's CURRENT shape (including local edits) in one go
+function copyAllZones() {
+  const snippet = Object.values(areaLayers).map(zoneSnippet).join('');
+  sendToOutput(snippet);
+  window.alert('✅ All ' + Object.keys(areaLayers).length + ' zones copied!\n\nPaste over the entries in areas.js (also in the box in Settings).');
 }
 
 // ── PLAYER LOCATION SHARING ───────────────────────────────────────
