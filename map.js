@@ -549,18 +549,33 @@ const handleIcon = L.divIcon({
   iconAnchor: [8, 8],
 });
 
+// Ghost handles sit at each edge's midpoint — drag one to bend the
+// line there (it becomes a real corner)
+const ghostIcon = L.divIcon({
+  className: '',
+  html: '<div style="width:12px;height:12px;background:rgba(255,255,255,0.75);' +
+        'border:2px dashed #f59e0b;border-radius:50%;"></div>',
+  iconSize: [12, 12],
+  iconAnchor: [6, 6],
+});
+
 function selectEditorZone(key) {
   const layer = areaLayers[key];
   if (!layer) return;
-  clearEditorHandles();
   editorKey = key;
 
   const hint = editorControl && editorControl.querySelector('#editor-hint');
-  if (hint) hint.textContent = '✏️ ' + layer.area.name + ' — drag the handles, then Copy';
+  if (hint) hint.textContent = '✏️ ' + layer.area.name + ' — drag corners; drag a small circle to add a corner';
   const copyBtn = editorControl && editorControl.querySelector('#editor-copy');
   if (copyBtn) copyBtn.disabled = false;
 
+  buildEditorHandles(layer);
+}
+
+function buildEditorHandles(layer) {
+  clearEditorHandles();
   const ring = layer.polygon.getLatLngs()[0];
+
   ring.forEach((latlng, i) => {
     const handle = L.marker(latlng, { icon: handleIcon, draggable: true, zIndexOffset: 2000 }).addTo(map);
     handle.on('drag', () => {
@@ -569,8 +584,30 @@ function selectEditorZone(key) {
     });
     handle.on('dragend', () => {
       layer.label.setLatLng(layer.polygon.getBounds().getCenter());
+      buildEditorHandles(layer); // refresh midpoints
     });
     editorHandles.push(handle);
+  });
+
+  // midpoint ghosts — dragging one inserts a new corner on that edge
+  ring.forEach((latlng, i) => {
+    const next = ring[(i + 1) % ring.length];
+    const mid  = L.latLng((latlng.lat + next.lat) / 2, (latlng.lng + next.lng) / 2);
+    const ghost = L.marker(mid, { icon: ghostIcon, draggable: true, zIndexOffset: 1900 }).addTo(map);
+    let insertAt = null;
+    ghost.on('dragstart', () => {
+      insertAt = i + 1;
+      ring.splice(insertAt, 0, ghost.getLatLng());
+    });
+    ghost.on('drag', () => {
+      ring[insertAt] = ghost.getLatLng();
+      layer.polygon.setLatLngs([ring]);
+    });
+    ghost.on('dragend', () => {
+      layer.label.setLatLng(layer.polygon.getBounds().getCenter());
+      buildEditorHandles(layer); // the new corner gets a full handle
+    });
+    editorHandles.push(ghost);
   });
 }
 
