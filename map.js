@@ -12,6 +12,8 @@ let lastPosition = null;
 // key → { area, polygon, label }
 const areaLayers    = {};
 const playerMarkers = {};
+// key → pulsing badge marker shown while a team is attempting there
+const attemptBadges = {};
 
 // Names too wide for their zone break onto two lines, one word per line
 const TWO_LINE_NAMES = new Set(['Main Campfire', 'RPG Glade', 'SD Glade', 'Village Square']);
@@ -160,6 +162,48 @@ function styleFor(owner, locked) {
   };
 }
 
+// A pulsing badge above the zone name while a team is attempting its
+// challenge: ⏳ for an initial attempt, ⚔️ for a steal duel, tinted
+// with the attempting team's colour
+function updateAttemptBadge(key, layer, a) {
+  const active = a.attemptingBy && !a.locked;
+  const sig    = active ? a.attemptingBy + '|' + (a.owner !== 0 ? 1 : 0) : '';
+
+  const existing = attemptBadges[key];
+  if (!active) {
+    if (existing) {
+      map.removeLayer(existing);
+      delete attemptBadges[key];
+    }
+    return;
+  }
+  if (existing && existing._sig === sig) return;
+  if (existing) map.removeLayer(existing);
+
+  const color  = states[a.attemptingBy].color;
+  const symbol = a.owner !== 0 ? '⚔️' : '⏳';
+  const icon = L.divIcon({
+    className: '',
+    html:
+      '<div class="player-dot" style="' +
+        '--pc:' + color + ';' +
+        'width:26px;height:26px;border-radius:50%;' +
+        'background:' + color + ';' +
+        'border:2px solid white;' +
+        'box-shadow:0 2px 6px rgba(0,0,0,0.4);' +
+        'display:flex;align-items:center;justify-content:center;' +
+        'font-size:14px;">' + symbol + '</div>',
+    iconSize:   [26, 26],
+    iconAnchor: [13, 40], // floats above the zone name
+  });
+
+  const badge = L.marker(layer.polygon.getBounds().getCenter(), {
+    icon, zIndexOffset: 1500, interactive: false,
+  }).addTo(map);
+  badge._sig = sig;
+  attemptBadges[key] = badge;
+}
+
 // Restyle every polygon from the latest game state — called on each
 // Firebase update so all phones recolour live. Claimed-but-unlocked
 // zones show hatched (stealable); locked zones are solid.
@@ -174,6 +218,7 @@ export function updateAreaLayers(gs) {
       layer.polygon._path.setAttribute('fill', 'url(#hatch-' + a.owner + ')');
     }
     layer.label.setContent(labelHTML(layer.area.name, a.locked));
+    updateAttemptBadge(key, layer, a);
   });
 }
 
