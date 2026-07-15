@@ -24,6 +24,21 @@ handed to an AI coding agent (or a human). **Read the constraints first.**
   `?code=<test code>` on different teams (join via Settings), plus a third tab in admin
   mode. There is no test suite yet (see P2-4).
 
+
+## Status (2026-07-15)
+
+**P0-1…P0-5, P1-1…P1-5 and P2-1…P2-7 are IMPLEMENTED** (commit history has the
+details). The P3 nice-to-haves remain open. Notes for whoever picks this up:
+
+- `node --test tests/` is the test entry point; this dev machine has no Node, so
+  the same assertions were verified via a browser harness (28/28) — run the Node
+  suite on a machine that has it.
+- All native dialogs were replaced by `modal.js`; the popup lives in `popup.js`,
+  the shape editor in `editor.js` (map.js ↔ popup.js import cycle is
+  intentional and runtime-safe).
+- `attempt.startedAt` deliberately remains client-clock (the timer is displayed
+  on the same phone that started it); only the log uses server timestamps.
+
 ---
 
 ## P0 — Bugs (fix first)

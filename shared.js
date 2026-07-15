@@ -62,10 +62,6 @@ export function teamName(gs, i) {
   return names[i] || states[i].label;
 }
 
-export function findArea(key) {
-  return allAreas.find(a => toKey(a.name) === key) || null;
-}
-
 // The two players on a team (entered when the team is joined)
 export function playerNames(gs, team) {
   const p = (gs && gs.players && gs.players[team]) || [];
@@ -189,12 +185,14 @@ export function isGameOver(gs) {
 // top of any claim/steal action to soft-block it
 export function gameOverGuard(gs) {
   if (!isGameOver(gs)) return false;
-  if (gs.winner) {
-    window.alert('🏆 The game is over — ' + teamName(gs, gs.winner.team) +
-      ' reached the winning score!');
-  } else {
-    window.alert('⏱️ The game has ended!\n\nNo more areas can be claimed or stolen.\nCheck the leaderboard for the final standings.');
-  }
+  // fire-and-forget import avoids a hard module cycle at load time
+  import('./modal.js').then(({ showInfo }) => {
+    if (gs.winner) {
+      showInfo('🏆 Game over', esc(teamName(gs, gs.winner.team)) + ' reached the winning score!');
+    } else {
+      showInfo('⏱️ Game over', 'The countdown has ended — no more areas can be claimed or stolen.<br>Check the leaderboard for the final standings.');
+    }
+  });
   return true;
 }
 

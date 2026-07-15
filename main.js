@@ -1,9 +1,12 @@
-import { pushState, mutateState, pushLog, listenToGameState, clearLog, listenToLog } from './firebase.js';
+import { pushState, mutateState, pushLog, listenToGameState, clearLog, listenToLog,
+         listenToConnection } from './firebase.js';
 import { initMap, addAreas, getMap } from './map.js';
 import { initSettings } from './settings.js';
 import { renderAll } from './ui.js';
 import { allAreas, gameState, fixArrays, toKey, esc, states, bonusSets,
-         formatCountdown, getGameCode, setGameCode, normalizeGameCode } from './shared.js';
+         formatCountdown, getGameCode, setGameCode, normalizeGameCode,
+         getScores, rankTeams, teamName } from './shared.js';
+import { showModal } from './modal.js';
 import { areaDefinitions } from './areas.js';
 
 function defaultState(areas) {
@@ -28,8 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Game code ──────────────────────────────────────────────────
   // Everything in Firebase lives under camp/<code>, and the security
   // rules only allow access with the right code — so nothing works
-  // (and nothing is exposed) without it. Asked once per device; if
-  // dismissed, it can be set later in Settings → Game Code.
+  // (and nothing is exposed) without it. Asked once per device.
 
   // A shared link like https://…/?code=xyz sets the code directly —
   // stored, then stripped from the address bar
@@ -39,15 +41,28 @@ document.addEventListener('DOMContentLoaded', () => {
     window.history.replaceState(null, '', window.location.pathname);
   }
 
-  if (!getGameCode()) {
-    const entered = normalizeGameCode(
-      window.prompt('🏕️ Enter the game code\n\n(ask whoever set up the game — letters, numbers and dashes only)')
-    );
-    if (entered) setGameCode(entered);
-  }
+  // The Firebase listener (below) awaits this before connecting
+  const codeReady = (async () => {
+    while (!getGameCode()) {
+      const res = await showModal({
+        title: '🏕️ Join the game',
+        bodyHTML: 'Enter the game code — ask whoever set up the game.',
+        fields: [{ id: 'code', label: 'Game code', placeholder: 'letters, numbers, dashes' }],
+        buttons: [{ id: 'ok', label: 'Connect', style: 'primary' }],
+      });
+      const code = normalizeGameCode(res && res.values.code);
+      if (code) setGameCode(code);
+    }
+  })();
 
   const settings = initSettings(() => {
-    pushState(defaultState(allAreas));
+    // A reset starts a fresh game but keeps the people: team names and
+    // player rosters survive; areas, attempts, fails and the log do not
+    const prev  = gameState.data || {};
+    const fresh = defaultState(allAreas);
+    if (prev.teamNames) fresh.teamNames = prev.teamNames;
+    if (prev.players)   fresh.players   = prev.players;
+    pushState(fresh);
     clearLog();
   });
 
@@ -170,12 +185,21 @@ document.addEventListener('DOMContentLoaded', () => {
       return gs;
     }).then(committed => {
       if (committed) {
+        // Announce the final standings, not just "game over"
+        const gs = gameState.data;
+        let standings = '';
+        if (gs) {
+          const { score } = getScores(gs);
+          const order = rankTeams(gs);
+          standings = ' ' + teamName(gs, order[0]) + ' wins with ' + score[order[0]] + ' pts (' +
+            order.slice(1).map(t => teamName(gs, t) + ' ' + score[t]).join(', ') + ').';
+        }
         pushLog({
           timestamp: Date.now(),
           team:      0,
           type:      'timer',
           big:       true,
-          message:   '🏁 GAME OVER — the countdown has ended! Check the leaderboard for final standings.',
+          message:   '🏁 GAME OVER — the countdown has ended!' + standings,
         });
       }
     });
@@ -242,7 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Load challenge text and merge with area geometry ───────────
   fetch('challenges.csv')
     .then(r => r.text())
-    .then(challengesCsv => {
+    .then(async challengesCsv => {
 
       // Tab-separated: Area, Challenge, Pass Mark, Timer — challenge
       // text can freely contain commas. Timer values: "countdown N"
@@ -305,6 +329,26 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       // ── Firebase listener ──────────────────────────────────────
+      await codeReady;
+
+      // Reads go silently stale when the connection drops — surface it
+      let disconnectedAt = null;
+      let everConnected  = false;
+      listenToConnection(connected => {
+        if (connected) {
+          everConnected  = true;
+          disconnectedAt = null;
+          if (gameState.data) document.getElementById('sync-status').textContent = '🟢 Live';
+        } else {
+          disconnectedAt = Date.now();
+        }
+      });
+      setInterval(() => {
+        if (everConnected && disconnectedAt && Date.now() - disconnectedAt > 5000) {
+          document.getElementById('sync-status').textContent = '🟡 Reconnecting…';
+        }
+      }, 2000);
+
       listenToGameState((data) => {
         if (data) {
           gameState.data = data;

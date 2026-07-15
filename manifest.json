@@ -1,0 +1,13 @@
+{
+  "name": "Camp Conquest",
+  "short_name": "CampConquest",
+  "description": "Territory game at the Strange Games Festival, Bushy Wood",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f0f2f5",
+  "theme_color": "#111827",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

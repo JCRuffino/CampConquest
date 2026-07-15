@@ -1,8 +1,9 @@
 import { mutateState, pushLog } from './firebase.js';
-import { gameState, getMyTeam, setMyTeam, states,
+import { gameState, getMyTeam, setMyTeam, states, teamName, esc,
          getGameCode, setGameCode, normalizeGameCode,
          isAdminMode, setAdminMode } from './shared.js';
 import { toggleAreaEditor } from './map.js';
+import { showModal, showConfirm } from './modal.js';
 
 export function initSettings(resetCallback) {
 
@@ -41,33 +42,58 @@ export function initSettings(resetCallback) {
     refreshAdminUI();
   }
 
+  // If the name write races the initial Firebase load (the transaction
+  // no-ops on empty state), stash it and flush once state arrives
+  let pendingPlayerNames = null;
+
+  async function savePlayerNames(t, names) {
+    const committed = await mutateState(gs => {
+      if (!gs.players) gs.players = {};
+      gs.players[t] = names;
+      return gs;
+    });
+    if (!committed) pendingPlayerNames = { t, names };
+  }
+
+  function rerender() {
+    refreshAssignUI();
+    if (gameState.data) {
+      import('./ui.js').then(({ renderAll }) => renderAll(gameState.data));
+    }
+  }
+
   assignBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const t      = parseInt(btn.dataset.team);
       const myTeam = getMyTeam();
-      if (myTeam === t) setMyTeam(null);
-      else if (myTeam !== null) return;
-      else {
-        // Challenges alternate between the two players, so the app
-        // needs both names when a team is joined
-        const existing = (gameState.data && gameState.data.players && gameState.data.players[t]) || [];
-        const n1 = window.prompt('👤 First team member\'s name?', existing[0] || '');
-        if (n1 === null) return; // cancelled — don't join
-        const n2 = window.prompt('👤 Second team member\'s name?', existing[1] || '');
-        if (n2 === null) return;
-        const names = [n1.trim().slice(0, 15) || 'Player 1', n2.trim().slice(0, 15) || 'Player 2'];
-        setMyTeam(t);
-        mutateState(gs => {
-          if (!gs.players) gs.players = {};
-          gs.players[t] = names;
-          return gs;
-        });
+      if (myTeam === t) {
+        setMyTeam(null);
+        rerender();
+        return;
       }
-      refreshAssignUI();
-      // Re-render UI so claim/steal buttons update immediately
-      if (gameState.data) {
-        import('./ui.js').then(({ renderAll }) => renderAll(gameState.data));
-      }
+      if (myTeam !== null) return;
+
+      // Challenges alternate between the two players, so the app
+      // needs both names when a team is joined
+      const existing = (gameState.data && gameState.data.players && gameState.data.players[t]) || [];
+      const res = await showModal({
+        title: 'Join ' + esc(teamName(gameState.data, t)),
+        bodyHTML: 'Who\'s on this team? The app alternates phone duty between you.',
+        fields: [
+          { id: 'n1', label: 'First team member',  value: existing[0] || '', maxlength: 15 },
+          { id: 'n2', label: 'Second team member', value: existing[1] || '', maxlength: 15 },
+        ],
+        buttons: [
+          { id: 'join',   label: 'Join team', style: 'primary' },
+          { id: 'cancel', label: 'Cancel',    style: 'ghost' },
+        ],
+        dismissable: true,
+      });
+      if (!res || res.button !== 'join') return;
+      const names = [res.values.n1 || 'Player 1', res.values.n2 || 'Player 2'];
+      setMyTeam(t);
+      savePlayerNames(t, names);
+      rerender();
     });
   });
 
@@ -193,10 +219,13 @@ export function initSettings(resetCallback) {
 
   if (codeLabel) codeLabel.textContent = 'Current code: ' + (getGameCode() || '—');
 
-  if (codeBtn) codeBtn.addEventListener('click', () => {
+  if (codeBtn) codeBtn.addEventListener('click', async () => {
     const code = normalizeGameCode(codeInput.value);
     if (!code) return;
-    if (!window.confirm('Switch to game code "' + code + '"?\n\nThe app will reload and connect to that game\'s data.')) return;
+    const ok = await showConfirm('🔑 Switch game code?',
+      'Switch to game code "<strong>' + esc(code) + '</strong>"?<br>The app will reload and connect to that game\'s data.',
+      'Switch & reload');
+    if (!ok) return;
     setGameCode(code);
     // Firebase listeners are bound to the old path — a reload is the
     // clean way to reconnect everything under the new code
@@ -283,13 +312,12 @@ export function initSettings(resetCallback) {
     // visibility handled by refreshAdminUI via the card
   }
 
-  resetBtn.addEventListener('click', () => {
+  resetBtn.addEventListener('click', async () => {
     if (!isAdminMode()) return;
-    const ok = window.confirm(
-      '⚠️ Reset the ENTIRE game?\n\n' +
-      'Every area goes back to unclaimed and the history is wiped.\n' +
-      'This cannot be undone.'
-    );
+    const ok = await showConfirm('⚠️ Reset the ENTIRE game?',
+      'Every area goes back to unclaimed and the history is wiped ' +
+      '(team names and player rosters are kept).<br><br><strong>This cannot be undone.</strong>',
+      'Yes, reset', 'Cancel', 'danger');
     if (!ok) return;
     resetCallback();
   });
@@ -297,6 +325,11 @@ export function initSettings(resetCallback) {
   // ── Public API ────────────────────────────────────────────────────
   function refresh() {
     const gs    = gameState.data;
+    if (pendingPlayerNames && gs) {
+      const p = pendingPlayerNames;
+      pendingPlayerNames = null;
+      savePlayerNames(p.t, p.names);
+    }
     const names = (gs && gs.teamNames) || {};
     [1, 2, 3].forEach(t => {
       const input = document.getElementById('name-input-' + t);

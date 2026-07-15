@@ -1,8 +1,15 @@
+// ── MAP ───────────────────────────────────────────────────────────
+// Leaflet init, area polygons + styling, attempt badges, and live
+// player locations. The popup lives in popup.js; the admin shape
+// editor in editor.js.
+
 import { pushPlayerLocation, removePlayerLocation, listenToPlayerLocations } from './firebase.js';
-import { states, gameState, toKey, getMyTeam, esc, teamName, playerNames,
-         hasStarted, getCurrentAttempt, isAdminMode, formatCountdown } from './shared.js';
-import { claimArea, failChallenge, startAttempt, adminSetArea } from './actions.js';
+import { states, gameState, toKey, getMyTeam, esc, teamName } from './shared.js';
+import { openAreaPopup, popupSync } from './popup.js';
+import { isEditorActive, selectEditorZone } from './editor.js';
 import { siteBoundary } from './areas.js';
+
+export { toggleAreaEditor } from './editor.js';
 
 let map;
 let userMarker   = null;
@@ -80,6 +87,10 @@ export function getMap() {
   return map;
 }
 
+export function getAreaLayers() {
+  return areaLayers;
+}
+
 // ── AREA POLYGONS ─────────────────────────────────────────────────
 export function addAreas(areas) {
   // Ground that belongs to no zone (gaps between unlinked zones, the
@@ -90,7 +101,7 @@ export function addAreas(areas) {
     { stroke: false, fillColor: '#9ca3af', fillOpacity: 0.45, interactive: false }
   ).addTo(map);
   ensureHatchPatterns();
-  if (noMansLand._path) noMansLand._path.setAttribute('fill', 'url(#hatch-0)');
+  setPatternFill(noMansLand, 'url(#hatch-0)', 0.12);
 
   areas.forEach(area => {
     const key = toKey(area.name);
@@ -109,11 +120,11 @@ export function addAreas(areas) {
       .addTo(map);
 
     polygon.on('click', e => {
-      if (editorActive) {
+      if (isEditorActive()) {
         selectEditorZone(key);
         return;
       }
-      handleAreaClick(area, e.latlng);
+      openAreaPopup(area, e.latlng);
     });
 
     areaLayers[key] = { area, polygon, label };
@@ -150,6 +161,16 @@ function ensureHatchPatterns() {
     defs.appendChild(pattern);
   });
   svg.appendChild(defs);
+}
+
+// Pattern fills need the polygon's SVG path element — a private
+// Leaflet API (`_path`, present with the default SVG renderer, pinned
+// at leaflet@1.9.4). If it's ever missing (e.g. canvas renderer), fall
+// back to a lighter solid fill so claimed-vs-locked stays readable.
+function setPatternFill(layer, patternUrl, fallbackOpacity) {
+  const path = layer._path;
+  if (path) path.setAttribute('fill', patternUrl);
+  else layer.setStyle({ fillOpacity: fallbackOpacity });
 }
 
 function styleFor(owner, locked) {
@@ -213,466 +234,14 @@ export function updateAreaLayers(gs) {
     const a = gs.areas && gs.areas[key];
     if (!a) return;
     layer.polygon.setStyle(styleFor(a.owner, a.locked));
-    if (a.owner !== 0 && !a.locked && layer.polygon._path) {
+    if (a.owner !== 0 && !a.locked) {
       // setStyle just wrote a solid fill attribute; swap it for the hatch
-      layer.polygon._path.setAttribute('fill', 'url(#hatch-' + a.owner + ')');
+      setPatternFill(layer.polygon, 'url(#hatch-' + a.owner + ')', 0.3);
     }
     layer.label.setContent(labelHTML(layer.area.name, a.locked));
     updateAttemptBadge(key, layer, a);
   });
-}
-
-// ── AREA POPUP ────────────────────────────────────────────────────
-function handleAreaClick(area, latlng) {
-  const gs = gameState.data;
-  if (!gs || !gs.areas) return;
-  const key = toKey(area.name);
-  const a   = gs.areas[key];
-  if (!a) return;
-
-  const myTeam   = getMyTeam();
-  const admin    = isAdminMode();
-  const expected = { owner: a.owner, locked: !!a.locked };
-
-  const isUnclaimed = a.owner === 0;
-  const isMine      = myTeam !== null && a.owner === myTeam;
-  const iFailed     = myTeam !== null && (a.failedBy || []).includes(myTeam);
-  const attempt     = myTeam !== null ? getCurrentAttempt(gs, myTeam, key) : null;
-  // Challenge text is revealed only once a team STARTS an attempt (or
-  // if you're the owner — you passed it — or a password admin)
-  const revealed    = admin || isMine || hasStarted(gs, myTeam, key);
-  // The admin can override the CSV pass mark mid-game
-  const passMark    = a.passMark || area.passMark;
-
-  const statusText = a.locked
-    ? '🔒 Locked by ' + esc(teamName(gs, a.owner)) + ' — cannot be taken'
-    : isUnclaimed
-      ? 'Unclaimed'
-      : 'Claimed by ' + esc(teamName(gs, a.owner)) + ' — can be stolen';
-
-  let body = '';
-  let actionsHTML = '';
-
-  if (revealed) {
-    body =
-      '<div style="margin-top:8px;">' +
-        '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;' +
-          'font-weight:700;color:white;background:#f4a300;">⚡ Challenge</span>' +
-        '<div style="font-size:12px;color:#374151;margin-top:4px;line-height:1.5;">' +
-          esc(area.challenge || 'No challenge set') + '</div>' +
-      '</div>';
-    // A stealing team is NOT shown the pass mark or the score to beat —
-    // they attempt blind and only learn the owner's result after
-    // committing their own
-    if (passMark && (isUnclaimed || isMine || admin)) {
-      body +=
-        '<div style="font-size:12px;color:#374151;margin-top:6px;">' +
-          '<span style="font-weight:700;">🎯 Pass mark:</span> ' + esc(passMark) +
-        '</div>';
-    }
-    if (!isUnclaimed && (isMine || admin)) {
-      body +=
-        '<div style="font-size:12px;color:#374151;margin-top:6px;">' +
-          '<span style="font-weight:700;">🏅 Result to beat:</span> ' +
-          esc(a.result || '—') +
-          ' <span style="color:#9ca3af;">(' + esc(teamName(gs, a.owner)) + ')</span>' +
-        '</div>';
-    }
-  } else {
-    body =
-      '<div style="font-size:12px;color:#6b7280;margin-top:8px;line-height:1.5;">' +
-        '❓ The challenge here is secret until your team starts an attempt.' +
-      '</div>';
-  }
-
-  if ((a.failedBy || []).length > 0) {
-    body += '<div style="font-size:11px;color:#9ca3af;margin-top:6px;">Locked out (failed): ' +
-      (a.failedBy || []).map(t => esc(teamName(gs, t))).join(', ') + '</div>';
-  }
-
-  if (a.attemptingBy && !a.locked) {
-    body += isUnclaimed
-      ? '<div style="font-size:12px;color:#f59e0b;font-weight:700;margin-top:6px;">' +
-        '⏳ ' + esc(teamName(gs, a.attemptingBy)) + ' is attempting this challenge right now!</div>'
-      : '<div style="font-size:12px;color:#e63946;font-weight:700;margin-top:6px;">' +
-        '⚔️ ' + esc(teamName(gs, a.attemptingBy)) + ' is contesting this area — win or lose, it locks!</div>';
-  }
-
-  if (a.locked) {
-    body += '<div style="font-size:12px;color:#6b7280;margin-top:8px;">' +
-      'This area is locked in for the rest of the game.</div>';
-  } else if (isMine) {
-    body += '<div style="font-size:12px;color:#6b7280;margin-top:8px;">' +
-      'Your area — another team can steal it (and lock it) by beating your result. If their steal fails, it locks for you.</div>';
-  } else if (myTeam === null) {
-    if (!admin) {
-      body += '<div style="font-size:12px;color:#9ca3af;margin-top:8px;">Join a team in Settings to play.</div>';
-    }
-  } else if (iFailed) {
-    body += '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
-      '❌ Your team failed this challenge — this area is off-limits to you for the rest of the game.</div>';
-  } else if (a.attemptingBy && a.attemptingBy !== myTeam) {
-    body += isUnclaimed
-      ? '<div style="font-size:12px;color:#f59e0b;font-weight:600;margin-top:8px;">' +
-        '⏳ Wait — ' + esc(teamName(gs, a.attemptingBy)) + ' is attempting this challenge. You can start if they fail.</div>'
-      : '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
-        '🚫 Too late — ' + esc(teamName(gs, a.attemptingBy)) + ' got here first. Only one team can contest a claimed area.</div>';
-  } else if (!attempt) {
-    // Not started yet — starting reveals the challenge (and any timer,
-    // which begins immediately: no warning, that's the fun) and commits
-    // the team to a pass or a fail
-    actionsHTML =
-      '<button id="start-btn" class="btn btn-full" style="margin-top:10px;background:' +
-      states[myTeam].color + ';">▶️ Start Challenge Attempt</button>' +
-      '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center;">' +
-        'Starting reveals the challenge and commits your team to a pass or a fail.' +
-        (isUnclaimed ? '' : ' Stealing shuts the other team out — win or lose, this area locks.') +
-      '</div>';
-  } else {
-    // Attempt in progress — phone-duty reminder, timer (if any), and
-    // resolve buttons
-    const players = playerNames(gs, myTeam);
-    const holder  = players[attempt.holder || 0];
-    const doer    = players[1 - (attempt.holder || 0)];
-    body +=
-      '<div style="font-size:12px;color:#374151;font-weight:600;margin-top:8px;' +
-        'background:#fef3c7;border-radius:8px;padding:6px 8px;">' +
-        '📱 ' + esc(holder) + ' holds the phone and reads aloud — 💪 ' + esc(doer) + ' does the challenge!' +
-      '</div>';
-    if (area.timer) {
-      const timerLabel = area.timer.mode === 'down'
-        ? area.timer.minutes + '-minute countdown'
-        : 'time elapsed';
-      body +=
-        '<div style="margin-top:10px;text-align:center;background:#111827;color:white;' +
-          'border-radius:10px;padding:8px;">' +
-          '<div style="font-size:10px;opacity:0.7;text-transform:uppercase;letter-spacing:0.05em;">' +
-            timerLabel + '</div>' +
-          '<div id="attempt-timer" style="font-size:22px;font-weight:800;">—</div>' +
-        '</div>';
-    }
-    const verb = isUnclaimed ? '⛺ We Passed — Claim!' : '🏁 We\'re Done — Enter Our Result';
-    actionsHTML =
-      '<button id="claim-btn" class="btn btn-full" style="margin-top:10px;background:' +
-      states[myTeam].color + ';">' + verb + '</button>' +
-      '<button id="fail-btn" class="btn btn-neutral btn-full" style="margin-top:6px;">' +
-        (isUnclaimed ? '❌ We Failed' : '❌ We Failed / Gave Up') + '</button>';
-  }
-
-  const content = document.createElement('div');
-  content.className = 'popup-box';
-  content.innerHTML =
-    '<strong>' + esc(area.name) + '</strong>' +
-    '<div class="popup-sub">' + statusText + '</div>' +
-    body +
-    '<div class="error-msg" id="popup-error"></div>' +
-    actionsHTML;
-
-  function showError(msg) {
-    const el = content.querySelector('#popup-error');
-    el.textContent   = msg;
-    el.style.display = 'block';
-  }
-
-  // Live ticker for the attempt timer
-  const timerEl = content.querySelector('#attempt-timer');
-  if (timerEl && attempt && area.timer) {
-    const tick = () => {
-      if (!timerEl.isConnected) { clearInterval(intv); return; }
-      const elapsed = Date.now() - attempt.startedAt;
-      if (area.timer.mode === 'down') {
-        const remaining = area.timer.minutes * 60000 - elapsed;
-        timerEl.textContent = remaining <= 0 ? "⏰ TIME'S UP" : formatCountdown(remaining);
-        if (remaining <= 0) timerEl.style.color = '#f87171';
-      } else {
-        timerEl.textContent = formatCountdown(elapsed);
-      }
-    };
-    const intv = setInterval(tick, 500);
-    tick();
-  }
-
-  const startBtn = content.querySelector('#start-btn');
-  if (startBtn) startBtn.addEventListener('click', async () => {
-    const ok = window.confirm(
-      '▶️ Start the challenge at ' + area.name + '?\n\n' +
-      'Only start when your team is AT this area and ready.\n' +
-      'The challenge is revealed, any timer starts immediately, and your ' +
-      'team must then record either a pass or a fail.'
-    );
-    if (!ok) return;
-    const res = await startAttempt(key, myTeam, expected);
-    if (!res.ok) { showError(res.reason || ''); return; }
-    window.alert(
-      '📱 Make sure ' + res.holder + ' is holding the phone!\n\n' +
-      res.holder + ' reads the challenge out loud — ' + res.attempter + ' is the one who does it.'
-    );
-    map.closePopup();
-    // Reopen straight away, now showing the challenge and timer
-    setTimeout(() => handleAreaClick(area, latlng), 150);
-  });
-
-  const claimBtn = content.querySelector('#claim-btn');
-  if (claimBtn) claimBtn.addEventListener('click', async () => {
-    // For count-up challenges the elapsed time IS the natural result
-    let suggested = '';
-    if (area.timer && area.timer.mode === 'up' && attempt) {
-      suggested = formatCountdown(Date.now() - attempt.startedAt);
-    }
-
-    if (isUnclaimed) {
-      if (!window.confirm(
-        '⛺ Claim ' + area.name + '?\n\nOnly press this if your team genuinely reached the pass mark' +
-        (passMark ? ' (' + passMark + ')' : '') + '!'
-      )) return;
-      const result = window.prompt(
-        '🏅 What result did your team get?\n(e.g. "14 catches", "3:38" — this is what others must beat)',
-        suggested
-      );
-      if (result === null) return;
-      const trimmed = result.trim().slice(0, 60);
-      if (!trimmed) { showError('You must record a result.'); return; }
-      const res = await claimArea(key, myTeam, expected, trimmed);
-      if (!res.ok) { showError(res.reason || ''); return; }
-      map.closePopup();
-      return;
-    }
-
-    // Steal: commit your result BLIND, then the owner's score is
-    // revealed and the comparison settles the duel either way
-    const result = window.prompt(
-      '🏅 What result did your team get?\n\nBe honest — you\'ll find out what you were up against next…',
-      suggested
-    );
-    if (result === null) return;
-    const trimmed = result.trim().slice(0, 60);
-    if (!trimmed) { showError('You must record a result.'); return; }
-
-    const beat = window.confirm(
-      '🥁 The score to beat was:\n\n    "' + (a.result || '—') + '" (' + teamName(gs, a.owner) + ')\n\n' +
-      'Your result: "' + trimmed + '"\n\n' +
-      'Did you BEAT it?\n\nOK = yes, we beat it — steal and lock the area.\n' +
-      'Cancel = no — the area locks for ' + teamName(gs, a.owner) + '.'
-    );
-    const res = beat
-      ? await claimArea(key, myTeam, expected, trimmed)
-      : await failChallenge(key, myTeam, expected);
-    if (!res.ok) { showError(res.reason || ''); return; }
-    map.closePopup();
-  });
-
-  const failBtn = content.querySelector('#fail-btn');
-  if (failBtn) failBtn.addEventListener('click', async () => {
-    const ok = window.confirm(
-      '❌ Record a FAILED attempt at ' + area.name + '?\n\n' +
-      (isUnclaimed
-        ? 'Your team will NEVER be able to attempt this area again.'
-        : 'The steal has failed — the area LOCKS permanently for ' + teamName(gs, a.owner) + '!')
-    );
-    if (!ok) return;
-    const res = await failChallenge(key, myTeam, expected);
-    if (!res.ok) { showError(res.reason || ''); return; }
-    map.closePopup();
-  });
-
-  // ── Admin: full control over the area ──────────────────────────
-  if (admin) {
-    const adminDiv = document.createElement('div');
-    adminDiv.innerHTML =
-      '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #eee;">' +
-        '<div style="font-size:11px;font-weight:700;color:#f59e0b;margin-bottom:6px;">⚙️ Admin: Set Area</div>' +
-        '<select id="admin-owner-select" style="width:100%;margin-bottom:6px;">' +
-          [0, 1, 2, 3].map(i =>
-            '<option value="' + i + '"' + (i === a.owner ? ' selected' : '') + '>' +
-            esc(teamName(gs, i)) + '</option>'
-          ).join('') +
-        '</select>' +
-        '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;' +
-          'text-transform:none;letter-spacing:0;font-weight:600;margin:0 0 6px;">' +
-          '<input type="checkbox" id="admin-locked-check"' + (a.locked ? ' checked' : '') + ' ' +
-            'style="width:auto;margin:0;" /> Locked' +
-        '</label>' +
-        '<input type="text" id="admin-result-input" maxlength="60" placeholder="Result to beat" ' +
-          'value="' + esc(a.result || '') + '" ' +
-          'style="width:100%;padding:6px 8px;border:1px solid #e5e7eb;border-radius:8px;' +
-          'font-size:12px;font-family:inherit;outline:none;margin-bottom:6px;box-sizing:border-box;" />' +
-        '<input type="text" id="admin-passmark-input" maxlength="60" placeholder="Pass mark" ' +
-          'value="' + esc(passMark || '') + '" ' +
-          'style="width:100%;padding:6px 8px;border:1px solid #e5e7eb;border-radius:8px;' +
-          'font-size:12px;font-family:inherit;outline:none;margin-bottom:8px;box-sizing:border-box;" />' +
-        '<button id="admin-apply-btn" class="btn btn-amber btn-full btn-sm">🔄 Apply</button>' +
-      '</div>';
-    content.appendChild(adminDiv);
-
-    adminDiv.querySelector('#admin-apply-btn').addEventListener('click', async () => {
-      await adminSetArea(key, {
-        owner:    parseInt(adminDiv.querySelector('#admin-owner-select').value),
-        locked:   adminDiv.querySelector('#admin-locked-check').checked,
-        result:   adminDiv.querySelector('#admin-result-input').value.trim().slice(0, 60),
-        passMark: adminDiv.querySelector('#admin-passmark-input').value.trim().slice(0, 60),
-      });
-      map.closePopup();
-    });
-  }
-
-  L.popup({ maxWidth: 280 })
-    .setLatLng(latlng)
-    .setContent(content)
-    .openOn(map);
-}
-
-// ── AREA EDITOR (admin tool) ──────────────────────────────────────
-// Adjust an existing zone: tap it, drag its corner handles, then copy
-// the updated snippet into areas.js. No new zones are created.
-let editorActive  = false;
-let editorKey     = null;
-let editorHandles = [];
-let editorControl = null;
-
-export function isEditorActive() {
-  return editorActive;
-}
-
-export function toggleAreaEditor() {
-  editorActive = !editorActive;
-  if (editorActive) startEditor();
-  else stopEditor();
-  return editorActive;
-}
-
-function startEditor() {
-  editorControl = document.createElement('div');
-  editorControl.id = 'editor-control';
-  editorControl.innerHTML =
-    '<div id="editor-hint" style="font-size:12px;font-weight:700;margin-bottom:6px;">✏️ Tap a zone to edit its corners</div>' +
-    '<div style="display:flex;gap:6px;justify-content:center;">' +
-      '<button id="editor-copy" class="btn btn-success btn-sm" disabled>📋 Copy Zone</button>' +
-      '<button id="editor-copy-all" class="btn btn-primary btn-sm">📋 Copy ALL Zones</button>' +
-    '</div>';
-  document.getElementById('screen-map').appendChild(editorControl);
-
-  editorControl.querySelector('#editor-copy').addEventListener('click', copyEditorSnippet);
-  editorControl.querySelector('#editor-copy-all').addEventListener('click', copyAllZones);
-}
-
-function stopEditor() {
-  clearEditorHandles();
-  editorKey = null;
-  if (editorControl) {
-    editorControl.remove();
-    editorControl = null;
-  }
-}
-
-function clearEditorHandles() {
-  editorHandles.forEach(h => map.removeLayer(h));
-  editorHandles = [];
-}
-
-const handleIcon = L.divIcon({
-  className: '',
-  html: '<div style="width:16px;height:16px;background:white;border:3px solid #f59e0b;' +
-        'border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>',
-  iconSize: [16, 16],
-  iconAnchor: [8, 8],
-});
-
-// Ghost handles sit at each edge's midpoint — drag one to bend the
-// line there (it becomes a real corner)
-const ghostIcon = L.divIcon({
-  className: '',
-  html: '<div style="width:12px;height:12px;background:rgba(255,255,255,0.75);' +
-        'border:2px dashed #f59e0b;border-radius:50%;"></div>',
-  iconSize: [12, 12],
-  iconAnchor: [6, 6],
-});
-
-function selectEditorZone(key) {
-  const layer = areaLayers[key];
-  if (!layer) return;
-  editorKey = key;
-
-  const hint = editorControl && editorControl.querySelector('#editor-hint');
-  if (hint) hint.textContent = '✏️ ' + layer.area.name + ' — drag corners; drag a small circle to add a corner';
-  const copyBtn = editorControl && editorControl.querySelector('#editor-copy');
-  if (copyBtn) copyBtn.disabled = false;
-
-  buildEditorHandles(layer);
-}
-
-function buildEditorHandles(layer) {
-  clearEditorHandles();
-  const ring = layer.polygon.getLatLngs()[0];
-
-  ring.forEach((latlng, i) => {
-    const handle = L.marker(latlng, { icon: handleIcon, draggable: true, zIndexOffset: 2000 }).addTo(map);
-    handle.on('drag', () => {
-      ring[i] = handle.getLatLng();
-      layer.polygon.setLatLngs([ring]);
-    });
-    handle.on('dragend', () => {
-      layer.label.setLatLng(layer.polygon.getBounds().getCenter());
-      buildEditorHandles(layer); // refresh midpoints
-    });
-    editorHandles.push(handle);
-  });
-
-  // midpoint ghosts — dragging one inserts a new corner on that edge
-  ring.forEach((latlng, i) => {
-    const next = ring[(i + 1) % ring.length];
-    const mid  = L.latLng((latlng.lat + next.lat) / 2, (latlng.lng + next.lng) / 2);
-    const ghost = L.marker(mid, { icon: ghostIcon, draggable: true, zIndexOffset: 1900 }).addTo(map);
-    let insertAt = null;
-    ghost.on('dragstart', () => {
-      insertAt = i + 1;
-      ring.splice(insertAt, 0, ghost.getLatLng());
-    });
-    ghost.on('drag', () => {
-      ring[insertAt] = ghost.getLatLng();
-      layer.polygon.setLatLngs([ring]);
-    });
-    ghost.on('dragend', () => {
-      layer.label.setLatLng(layer.polygon.getBounds().getCenter());
-      buildEditorHandles(layer); // the new corner gets a full handle
-    });
-    editorHandles.push(ghost);
-  });
-}
-
-function zoneSnippet(layer) {
-  const ring = layer.polygon.getLatLngs()[0];
-  return (
-    '  {\n' +
-    '    name: "' + layer.area.name.replace(/"/g, '\\"') + '",\n' +
-    '    polygon: [\n' +
-    ring.map(p => '      [' + p.lat.toFixed(6) + ', ' + p.lng.toFixed(6) + '],').join('\n') + '\n' +
-    '    ],\n' +
-    '  },\n'
-  );
-}
-
-function sendToOutput(snippet) {
-  const out = document.getElementById('editor-output');
-  if (out) {
-    out.value += snippet;
-    out.parentElement.style.display = 'block';
-  }
-  if (navigator.clipboard) navigator.clipboard.writeText(snippet).catch(() => {});
-  console.log('✏️ Area snippet:\n' + snippet);
-}
-
-function copyEditorSnippet() {
-  if (!editorKey) return;
-  const layer = areaLayers[editorKey];
-  sendToOutput(zoneSnippet(layer));
-  window.alert('✅ Updated "' + layer.area.name + '" copied!\n\nPaste it over that area\'s entry in areas.js (also in the box in Settings). The change is only on this device until areas.js is updated.');
-}
-
-// Every zone's CURRENT shape (including local edits) in one go
-function copyAllZones() {
-  const snippet = Object.values(areaLayers).map(zoneSnippet).join('');
-  sendToOutput(snippet);
-  window.alert('✅ All ' + Object.keys(areaLayers).length + ' zones copied!\n\nPaste over the entries in areas.js (also in the box in Settings).');
+  popupSync(gs);
 }
 
 // ── PLAYER LOCATION SHARING ───────────────────────────────────────

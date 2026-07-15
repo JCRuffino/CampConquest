@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, push, onValue, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, set, push, onValue, remove, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { sanitiseForFirebase, fixArrays, getGameCode } from './shared.js';
 
@@ -117,14 +117,26 @@ export function listenToPlayerLocations(callback) {
 }
 
 // ── GAME LOG WRITE ────────────────────────────────────────────────
+// The timestamp is always the SERVER's clock — a phone with a skewed
+// clock would otherwise break history ordering and suppress everyone
+// else's toasts (which fire on timestamp > last-seen)
 export async function pushLog(entry) {
   await authReady;
-  return push(ref(db, DB_ROOT() + '/gameLog'), entry);
+  return push(ref(db, DB_ROOT() + '/gameLog'), { ...entry, timestamp: serverTimestamp() });
 }
 
 export async function clearLog() {
   await authReady;
   return set(ref(db, DB_ROOT() + '/gameLog'), null);
+}
+
+// ── CONNECTION STATE ──────────────────────────────────────────────
+// True/false as the client's link to the RTDB comes and goes — used
+// for the "reconnecting" indicator (reads go silently stale otherwise)
+export function listenToConnection(callback) {
+  authReady.then(() => {
+    onValue(ref(db, '.info/connected'), snap => callback(!!snap.val()));
+  });
 }
 
 // ── GAME LOG READ ─────────────────────────────────────────────────
