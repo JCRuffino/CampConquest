@@ -43,6 +43,10 @@ export async function claimArea(key, team, expected, result) {
       failReason = 'Your team failed this challenge — you can\'t attempt this area again.';
       return;
     }
+    if (a.attemptingBy && a.attemptingBy !== team) {
+      failReason = 'Another team is attempting this challenge right now.';
+      return;
+    }
     wasSteal   = a.owner !== 0;
     prevOwner  = a.owner;
     prevResult = a.result || '';
@@ -52,7 +56,7 @@ export async function claimArea(key, team, expected, result) {
     // failedBy is NOT cleared — failing an area bars that team from it
     // for the rest of the game
     a.era      = (a.era || 0) + 1; // stale attempts no longer count as in-progress
-    delete a.contestedBy;
+    delete a.attemptingBy;
 
     // Controlling more than half the areas wins immediately
     winInfo = majorityWinner(gs);
@@ -135,7 +139,7 @@ export async function failChallenge(key, team, expected) {
     if (a.owner !== 0) {
       // failed steal → the owner keeps the area permanently
       a.locked = true;
-      delete a.contestedBy;
+      delete a.attemptingBy;
       lockedForOwner = a.owner;
       return gs;
     }
@@ -145,6 +149,7 @@ export async function failChallenge(key, team, expected) {
       return;
     }
     a.failedBy.push(team);
+    delete a.attemptingBy; // the challenge is free for other teams again
     return gs;
   });
 
@@ -201,16 +206,16 @@ export async function startAttempt(key, team, expected) {
       failReason = 'Your team failed this challenge — you can\'t attempt this area again.';
       return;
     }
-    // A claimed area can only be contested by ONE rival team: the first
-    // to start a steal attempt shuts the third team out, and the duel
-    // ends with the area locked either way
-    if (a.owner !== 0) {
-      if (a.contestedBy && a.contestedBy !== team) {
-        failReason = 'Too late — another team is already contesting this area.';
-        return;
-      }
-      a.contestedBy = team;
+    // Only one team can be attempting an area's challenge at a time —
+    // this also stops a claim landing under another team's feet and
+    // silently turning their initial attempt into a steal
+    if (a.attemptingBy && a.attemptingBy !== team) {
+      failReason = a.owner !== 0
+        ? 'Too late — another team is already contesting this area.'
+        : 'Another team is attempting this challenge right now — wait for their result.';
+      return;
     }
+    a.attemptingBy = team;
     // Phone duty alternates with each challenge the team attempts: one
     // player holds the phone and reads the challenge aloud, the other
     // one does it
@@ -266,8 +271,10 @@ export async function adminSetArea(key, fields) {
     if (clearFails) {
       a.failedBy = [];
       a.era      = (a.era || 0) + 1;
-      delete a.contestedBy;
     }
+    // Admin apply always frees a stuck attempt (e.g. a team that
+    // started and wandered off without resolving)
+    delete a.attemptingBy;
 
     // Recompute the majority win, so a mistaken claim that "won" the
     // game can be undone (or a correction can trigger the win)

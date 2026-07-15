@@ -242,9 +242,12 @@ function handleAreaClick(area, latlng) {
       (a.failedBy || []).map(t => esc(teamName(gs, t))).join(', ') + '</div>';
   }
 
-  if (a.contestedBy && !a.locked) {
-    body += '<div style="font-size:12px;color:#e63946;font-weight:700;margin-top:6px;">' +
-      '⚔️ ' + esc(teamName(gs, a.contestedBy)) + ' is contesting this area — win or lose, it locks!</div>';
+  if (a.attemptingBy && !a.locked) {
+    body += isUnclaimed
+      ? '<div style="font-size:12px;color:#f59e0b;font-weight:700;margin-top:6px;">' +
+        '⏳ ' + esc(teamName(gs, a.attemptingBy)) + ' is attempting this challenge right now!</div>'
+      : '<div style="font-size:12px;color:#e63946;font-weight:700;margin-top:6px;">' +
+        '⚔️ ' + esc(teamName(gs, a.attemptingBy)) + ' is contesting this area — win or lose, it locks!</div>';
   }
 
   if (a.locked) {
@@ -260,9 +263,12 @@ function handleAreaClick(area, latlng) {
   } else if (iFailed) {
     body += '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
       '❌ Your team failed this challenge — this area is off-limits to you for the rest of the game.</div>';
-  } else if (a.contestedBy && a.contestedBy !== myTeam) {
-    body += '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
-      '🚫 Too late — ' + esc(teamName(gs, a.contestedBy)) + ' got here first. Only one team can contest a claimed area.</div>';
+  } else if (a.attemptingBy && a.attemptingBy !== myTeam) {
+    body += isUnclaimed
+      ? '<div style="font-size:12px;color:#f59e0b;font-weight:600;margin-top:8px;">' +
+        '⏳ Wait — ' + esc(teamName(gs, a.attemptingBy)) + ' is attempting this challenge. You can start if they fail.</div>'
+      : '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
+        '🚫 Too late — ' + esc(teamName(gs, a.attemptingBy)) + ' got here first. Only one team can contest a claimed area.</div>';
   } else if (!attempt) {
     // Not started yet — starting reveals the challenge (and any timer,
     // which begins immediately: no warning, that's the fun) and commits
