@@ -7,25 +7,24 @@ export function renderAll(gs) {
   updateAreaLayers(gs);
 }
 
-// Mini scoreboard on the map: per team, the size of its largest
-// connected group (the score) with total zones in brackets
+// Mini scoreboard on the map: each team's score (areas + bonuses)
 function updateMapScoreboard(gs) {
   const el = document.getElementById('map-scoreboard');
   if (!el) return;
-  const { counts, cluster } = getScores(gs);
+  const { bonuses, score } = getScores(gs);
   el.innerHTML = [1, 2, 3].map(t =>
     '<span style="display:inline-flex;align-items:center;gap:4px;">' +
       '<span style="width:10px;height:10px;border-radius:50%;background:' +
         states[t].color + ';display:inline-block;"></span>' +
-      '🔗' + cluster[t] +
-      '<span style="font-size:10px;color:#9ca3af;">(' + counts[t] + ')</span>' +
+      score[t] +
+      (bonuses[t].length ? '<span style="font-size:10px;color:#f59e0b;">★' + bonuses[t].length + '</span>' : '') +
     '</span>'
   ).join('');
 }
 
 // ── LEADERBOARD ───────────────────────────────────────────────────
 function updateLeaderboard(gs) {
-  const { counts, locked, cluster } = getScores(gs);
+  const { counts, locked, bonuses, score } = getScores(gs);
   const sorted = rankTeams(gs);
 
   const winnerEl = document.getElementById('lb-winner-banner');
@@ -46,15 +45,22 @@ function updateLeaderboard(gs) {
   lbEl.innerHTML = '';
   sorted.forEach((i, rank) => {
     const medal = ['🥇', '🥈', '🥉'][rank];
+    const bonusLine = bonuses[i].length
+      ? '<div style="font-size:11px;color:#f59e0b;font-weight:600;padding-left:24px;line-height:1.5;">' +
+        bonuses[i].map(esc).join(' · ') + '</div>'
+      : '';
     const row = document.createElement('div');
     row.className = 'lb-row';
     row.innerHTML =
-      '<div class="lb-left">' +
-        '<div class="lb-dot" style="background:' + states[i].color + '"></div>' +
-        '<span>' + medal + ' ' + esc(teamName(gs, i)) + '</span>' +
+      '<div class="lb-left" style="flex-direction:column;align-items:flex-start;gap:2px;">' +
+        '<div style="display:flex;align-items:center;gap:10px;">' +
+          '<div class="lb-dot" style="background:' + states[i].color + '"></div>' +
+          '<span>' + medal + ' ' + esc(teamName(gs, i)) + '</span>' +
+        '</div>' +
+        bonusLine +
       '</div>' +
-      '<div class="lb-value">🔗 ' + cluster[i] +
-        '<span style="font-size:12px;font-weight:600;color:#6b7280;margin-left:6px;">' + counts[i] + ' total</span>' +
+      '<div class="lb-value">' + score[i] +
+        '<span style="font-size:12px;font-weight:600;color:#6b7280;margin-left:6px;">' + counts[i] + ' areas</span>' +
         '<span style="font-size:12px;font-weight:600;color:#9b59b6;margin-left:6px;">🔒 ' + locked[i] + '</span>' +
       '</div>';
     lbEl.appendChild(row);

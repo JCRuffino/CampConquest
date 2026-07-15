@@ -437,9 +437,10 @@
         box-shadow:0 2px 10px rgba(0,0,0,0.2);"></div>
 
       <div class="lb-card">
-        <h3>🔗 Largest Connected Group</h3>
+        <h3>🏅 Score</h3>
         <div style="font-size:11px;color:#9ca3af;margin:-8px 0 10px;">
-          Biggest group of connected zones wins · ties: total zones, then 🔒 locked
+          1 pt per area · +1 for all Birches / all Willows / all Oaks / both Glades ·
+          +1 for the biggest connected group (tie = nobody)
         </div>
         <div id="leaderboard-rows"></div>
       </div>
@@ -568,9 +569,10 @@
         <div class="accordion-item">
           <button class="accordion-btn">🎯 Objective</button>
           <div class="accordion-body">
-            <p>Build the biggest <strong>connected group</strong> of areas. Areas that touch each other count as next to each other; areas separated by a hatched grey gap do not. Your score is the size of your largest group of linked areas, and the team with the biggest group when the countdown ends wins.</p>
-            <p><strong>Instant win:</strong> if a team ever controls <strong>more than half of all areas</strong> — locked or not — the game ends immediately and they win.</p>
-            <p>Both locked and unlocked areas count. Ties are broken by total areas controlled, then by locked areas.</p>
+            <p>Score the most points! You get <strong>1 point per area</strong> you control, plus bonus points:</p>
+            <p><strong>+1</strong> for owning all the Birches · <strong>+1</strong> for all the Willows · <strong>+1</strong> for all the Oaks · <strong>+1</strong> for both Glades (RPG + SD) · <strong>+1</strong> for having the biggest connected group of touching areas (if teams tie for biggest, nobody gets it).</p>
+            <p>Areas that touch each other count as connected; areas separated by a hatched grey gap do not. Locked and unlocked areas are worth the same.</p>
+            <p><strong>Instant win:</strong> if a team ever controls <strong>more than half of all areas</strong>, the game ends immediately and they win.</p>
           </div>
         </div>
 
@@ -617,7 +619,7 @@
           <button class="accordion-btn">🏆 Winning</button>
           <div class="accordion-body">
             <p><strong>Instant win:</strong> control more than half of all areas at any moment (locked or not) and the game ends on the spot — the app announces it.</p>
-            <p><strong>Timer win:</strong> when the countdown ends, the team with the <strong>largest connected group</strong> of touching areas wins. Ties are broken by total areas controlled, then by locked areas. A scattered empire loses to a connected one!</p>
+            <p><strong>Timer win:</strong> when the countdown ends, the highest <strong>score</strong> wins — areas owned plus bonus points (the full sets and the biggest connected group). Ties are broken by locked areas.</p>
           </div>
         </div>
 

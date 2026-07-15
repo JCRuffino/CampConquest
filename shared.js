@@ -231,7 +231,16 @@ export function sanitiseForFirebase(obj) {
 }
 
 // ── SCORING ───────────────────────────────────────────────────────
-// Returns { counts: {1,2,3,0}, locked: {1,2,3}, cluster: {1,2,3} }
+// Score = 1 point per area owned, +1 for each completed set below,
+// +1 for the (uniquely) biggest connected group of areas.
+export const bonusSets = [
+  { label: 'All the Birches', emoji: '🌲', names: ['Birches 1', 'Birches 2', 'Birches 3'] },
+  { label: 'All the Willows', emoji: '🌿', names: ['Willows 1', 'Willows 2', 'Willows 4', 'Willows 5'] },
+  { label: 'All the Oaks',    emoji: '🌳', names: ['Oaks 1', 'Oaks 2', 'Oaks 3', 'Oaks 4'] },
+  { label: 'Both Glades',     emoji: '🏕️', names: ['RPG Glade', 'SD Glade'] },
+];
+
+// Returns { counts, locked, cluster, bonuses (labels per team), score }
 export function getScores(gs) {
   const counts = { 0: 0, 1: 0, 2: 0, 3: 0 };
   const locked = { 1: 0, 2: 0, 3: 0 };
@@ -239,19 +248,44 @@ export function getScores(gs) {
     counts[a.owner] = (counts[a.owner] || 0) + 1;
     if (a.owner && a.locked) locked[a.owner]++;
   });
+
   const cluster = {
     1: largestCluster(gs, 1),
     2: largestCluster(gs, 2),
     3: largestCluster(gs, 3),
   };
-  return { counts, locked, cluster };
+
+  const bonuses = { 1: [], 2: [], 3: [] };
+  [1, 2, 3].forEach(t => {
+    bonusSets.forEach(set => {
+      const ownsAll = set.names.every(n => {
+        const a = gs.areas && gs.areas[toKey(n)];
+        return a && a.owner === t;
+      });
+      if (ownsAll) bonuses[t].push(set.emoji + ' ' + set.label);
+    });
+  });
+
+  // Biggest connected group: +1, but only for a unique winner
+  const maxCluster = Math.max(cluster[1], cluster[2], cluster[3]);
+  if (maxCluster > 0) {
+    const leaders = [1, 2, 3].filter(t => cluster[t] === maxCluster);
+    if (leaders.length === 1) bonuses[leaders[0]].push('🔗 Most connected (' + maxCluster + ')');
+  }
+
+  const score = {
+    1: counts[1] + bonuses[1].length,
+    2: counts[2] + bonuses[2].length,
+    3: counts[3] + bonuses[3].length,
+  };
+
+  return { counts, locked, cluster, bonuses, score };
 }
 
-// Sort teams by largest connected group; total areas then locked areas
-// break ties
+// Sort teams by score; locked areas break ties
 export function rankTeams(gs) {
-  const { counts, locked, cluster } = getScores(gs);
+  const { counts, locked, score } = getScores(gs);
   return [1, 2, 3].sort((a, b) =>
-    (cluster[b] - cluster[a]) || (counts[b] - counts[a]) || (locked[b] - locked[a])
+    (score[b] - score[a]) || (locked[b] - locked[a]) || (counts[b] - counts[a])
   );
 }
