@@ -241,9 +241,10 @@ export function initSettings(resetCallback) {
   const adminInput   = document.getElementById('admin-password-input');
   const adminBtn     = document.getElementById('admin-unlock-btn');
   const adminError   = document.getElementById('admin-password-error');
-  const adminRow     = document.getElementById('admin-unlock-row');
-  const editorCard   = document.getElementById('editor-card');
-  const resetCard    = document.getElementById('reset-card');
+  const adminRow      = document.getElementById('admin-unlock-row');
+  const editorCard    = document.getElementById('editor-card');
+  const resetCard     = document.getElementById('reset-card');
+  const broadcastCard = document.getElementById('broadcast-card');
 
   function refreshAdminUI() {
     const on = isAdminMode();
@@ -255,8 +256,9 @@ export function initSettings(resetCallback) {
     }
     if (adminRow)    adminRow.style.display   = on ? 'none' : 'flex';
     if (adminBtn)    adminBtn.textContent     = on ? '🔒 Lock' : 'Unlock';
-    if (editorCard)  editorCard.style.display = on ? 'block' : 'none';
-    if (resetCard)   resetCard.style.display  = on ? 'block' : 'none';
+    if (editorCard)    editorCard.style.display    = on ? 'block' : 'none';
+    if (resetCard)     resetCard.style.display     = on ? 'block' : 'none';
+    if (broadcastCard) broadcastCard.style.display = on ? 'block' : 'none';
     const lockBtn = document.getElementById('admin-lock-btn');
     if (lockBtn) lockBtn.style.display = on ? 'inline-flex' : 'none';
     refreshTimerUI();
@@ -289,6 +291,27 @@ export function initSettings(resetCallback) {
     if (gameState.data) {
       import('./ui.js').then(({ renderAll }) => renderAll(gameState.data));
     }
+  });
+
+  // ── Broadcast (admin) ─────────────────────────────────────────────
+  const broadcastInput = document.getElementById('broadcast-input');
+  const broadcastBtn   = document.getElementById('broadcast-btn');
+
+  if (broadcastBtn) broadcastBtn.addEventListener('click', () => {
+    if (!isAdminMode()) return;
+    const text = broadcastInput.value.trim().slice(0, 120);
+    if (!text) return;
+    pushLog({
+      team:    0,
+      type:    'timer', // renders as the full-width banner in History
+      big:     true,    // toasts on every device
+      message: '📣 ' + text,
+    });
+    broadcastInput.value = '';
+  });
+
+  if (broadcastInput) broadcastInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') broadcastBtn.click();
   });
 
   // ── Area editor (admin) ───────────────────────────────────────────

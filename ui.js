@@ -3,8 +3,53 @@ import { updateAreaLayers } from './map.js';
 
 export function renderAll(gs) {
   updateLeaderboard(gs);
+  updateActivity(gs);
   updateMapScoreboard(gs);
   updateAreaLayers(gs);
+}
+
+// ── "RIGHT NOW" PANEL ─────────────────────────────────────────────
+// Attempts in progress (with age) and each team's permanent lockouts,
+// so the state of the board is readable without tapping every zone
+function updateActivity(gs) {
+  const el = document.getElementById('lb-activity');
+  if (!el) return;
+
+  const rows = [];
+
+  Object.entries(gs.areas || {}).forEach(([key, a]) => {
+    if (!a.attemptingBy || a.locked) return;
+    const att = (gs.attempts && gs.attempts[a.attemptingBy] && gs.attempts[a.attemptingBy][key]) || null;
+    const mins = att ? Math.floor((Date.now() - att.startedAt) / 60000) : null;
+    const age  = mins === null ? '' : (mins < 1 ? 'just started' : mins + ' min');
+    rows.push(
+      '<div class="lb-row"><div class="lb-left">' +
+        '<div class="lb-dot" style="background:' + states[a.attemptingBy].color + '"></div>' +
+        '<span>' + (a.owner !== 0 ? '⚔️' : '⏳') + ' ' + esc(teamName(gs, a.attemptingBy)) +
+        ' at <strong>' + esc(a.displayName) + '</strong>' +
+        (a.owner !== 0 ? ' (stealing from ' + esc(teamName(gs, a.owner)) + ')' : '') +
+        '</span></div>' +
+        '<div style="font-size:12px;font-weight:600;color:#9ca3af;">' + esc(age) + '</div></div>'
+    );
+  });
+
+  [1, 2, 3].forEach(t => {
+    const lockedOut = Object.values(gs.areas || {})
+      .filter(a => !a.locked && (a.failedBy || []).includes(t))
+      .map(a => a.displayName)
+      .sort();
+    if (!lockedOut.length) return;
+    rows.push(
+      '<div class="lb-row"><div class="lb-left" style="align-items:flex-start;">' +
+        '<div class="lb-dot" style="background:' + states[t].color + ';margin-top:3px;"></div>' +
+        '<span style="font-size:12px;color:#6b7280;">❌ ' + esc(teamName(gs, t)) +
+        ' locked out of: ' + lockedOut.map(esc).join(', ') + '</span></div></div>'
+    );
+  });
+
+  el.innerHTML = rows.length
+    ? rows.join('')
+    : '<div style="font-size:12px;color:#9ca3af;font-style:italic;">Nothing happening right now — get out there!</div>';
 }
 
 // Mini scoreboard on the map: each team's score (areas + bonuses)

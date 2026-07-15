@@ -50,6 +50,11 @@
       </div>
 
       <div class="lb-card">
+        <h3>⚡ Right Now</h3>
+        <div id="lb-activity"></div>
+      </div>
+
+      <div class="lb-card">
         <h3>🗺️ Territory Breakdown</h3>
         <div id="lb-area-breakdown"></div>
       </div>
@@ -138,6 +143,16 @@
           ❌ Incorrect password
         </div>
         <button id="admin-lock-btn" class="btn btn-ghost btn-sm" style="display:none;margin-top:4px;">🔒 Lock admin mode</button>
+      </div>
+
+      <div class="settings-card" id="broadcast-card" style="display:none;">
+        <div class="settings-card-title">📣 Broadcast (Admin)</div>
+        <div class="settings-card-desc">Send a message to every player's screen — it pops up as a toast and stays in the History.</div>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="broadcast-input" maxlength="120" placeholder="e.g. Lunch at the Village Square in 10!"
+            style="flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;outline:none;" />
+          <button id="broadcast-btn" class="btn btn-primary btn-sm">Send</button>
+        </div>
       </div>
 
       <div class="settings-card" id="editor-card" style="display:none;">
