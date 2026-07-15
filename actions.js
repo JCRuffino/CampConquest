@@ -87,12 +87,15 @@ export async function claimArea(key, team, expected, result) {
     });
   }
   if (winInfo) {
+    // The winner isn't necessarily the acting team — e.g. a steal can
+    // shift the most-connected bonus to a third party and push THEM
+    // over the line
     pushLog({
       timestamp: Date.now(),
-      team,
+      team: winInfo.team,
       type: 'timer',
       big:  true,
-      message: '🏆 ' + teamName(gs, team) + ' has reached ' + winInfo.score +
+      message: '🏆 ' + teamName(gs, winInfo.team) + ' has reached ' + winInfo.score +
                ' points — THEY WIN THE GAME!',
     });
     return { ok: true };
