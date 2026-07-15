@@ -17,7 +17,6 @@ export async function claimArea(key, team, expected, result) {
   let failReason = '';
   let wasSteal   = false;
   let prevOwner  = 0;
-  let prevResult = '';
   let winInfo    = null;
 
   const committed = await mutateState(gs => {
@@ -49,7 +48,6 @@ export async function claimArea(key, team, expected, result) {
     }
     wasSteal   = a.owner !== 0;
     prevOwner  = a.owner;
-    prevResult = a.result || '';
     a.owner    = team;
     a.result   = result;
     a.locked   = wasSteal; // a stolen area locks permanently
@@ -68,6 +66,8 @@ export async function claimArea(key, team, expected, result) {
 
   const gs = gameState.data;
   const name = (gs.areas[key] && gs.areas[key].displayName) || key;
+  // Results are deliberately NOT logged — a team should only learn the
+  // score to beat from the area popup, after starting the challenge
   if (wasSteal) {
     pushLog({
       timestamp: Date.now(),
@@ -75,7 +75,7 @@ export async function claimArea(key, team, expected, result) {
       type: 'steal',
       big:  true,
       message: '😈 ' + teamName(gs, team) + ' stole ' + name + ' from ' + teamName(gs, prevOwner) +
-               ' — beat "' + prevResult + '" with "' + result + '". It is now locked! 🔒',
+               ' — it is now locked! 🔒',
     });
   } else {
     pushLog({
@@ -83,7 +83,7 @@ export async function claimArea(key, team, expected, result) {
       team,
       type: 'claim',
       big:  true,
-      message: '⛺ ' + teamName(gs, team) + ' claimed ' + name + ' with a result of "' + result + '"',
+      message: '⛺ ' + teamName(gs, team) + ' claimed ' + name,
     });
   }
   if (winInfo) {
