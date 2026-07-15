@@ -1,22 +1,22 @@
 Area	Challenge	Pass Mark	Timer
-Main Campfire	Placeholder: longest continuous campfire song medley without stopping or repeating a song (record the time).	2 minutes
-SD Glade	Placeholder: win a round of a social deduction mini-game against volunteers — fastest correct accusation wins steals (record your time).	Under 5 minutes	countup
-Village Square	Placeholder: most items borrowed from strangers in the square before the timer runs out, returned after (record the count).	5 items	countdown 5
-Shops	Placeholder: guess the price of 5 items from the shop — most guesses within 50p wins (record the count).	3 of 5
-Arena	Placeholder: most keepy-uppies / consecutive catches in a single run before the timer runs out (record the count).	10	countdown 5
-Beeches	Placeholder: tallest freestanding stick tower you can build before the timer runs out (record height: knee/waist/chest/head).	Knee height	countdown 10
-Chapel	Placeholder: recite a made-up 30-second sermon — rated 1-10 by a neutral player (record the score).	5
-RPG Glade	Placeholder: most convincing monster impression rated 1-10 by a neutral player (record the score).	5
-Willows 1	Placeholder: most star jumps in 60 seconds (record the number).	30
-Birches 1	Placeholder: furthest welly throw (record the distance in paces).	15 paces
-Oaks 1	Placeholder: say the tongue twister 3 times without a mistake — the timer starts now, stop it when you're done (record your time).	Under 30 seconds	countup
-Meadow	Placeholder: find and photograph 5 different insects — the timer starts now, stop it when you have all 5 (record your time).	Under 10 minutes	countup
-Willows 4	Placeholder: most thrown grapes caught in the mouth out of 10 (record the count).	4
-Willows 5	Placeholder: longest plank hold (record the time).	60 seconds
-Birches 2	Placeholder: most pieces of kindling collected and stacked before the timer runs out (record the count).	15 pieces	countdown 5
-Oaks 2	Placeholder: fastest three-legged lap of the glade (record the time).	Under 2 minutes
-Willows 2	Placeholder: longest continuous tree hug without letting go (record the time).	2 minutes
-Birches 3	Placeholder: hide and seek — one teammate hides, the other must find them before the timer runs out (record how long they stayed hidden).	2 minutes	countdown 5
-Oaks 3	Placeholder: most bounces of a ball on a frying pan / board without dropping, best run before the timer runs out (record the count).	20	countdown 5
-Oaks 4	Placeholder: longest time standing perfectly still and silent while others try to make you laugh (record the time).	60 seconds
-Chestnut	Placeholder: build a den big enough for one teammate to hide inside before the timer runs out.	Hides one teammate	countdown 10
+Main Campfire	PLAYTEST: Roll a D20 until you roll a 17. Record how many rolls it took (fewer is better).	20 rolls or fewer
+Chapel	PLAYTEST: Cumulatively roll 95 or above on a D20 before the timer runs out. Record your final total (higher is better).	Reach 95	countdown 5
+SD Glade	PLAYTEST: Roll a D20 until you roll a 20. The clock is running — record your time (faster is better).	Under 4:00	countup
+Village Square	PLAYTEST: Cumulatively roll 121 or above on a D20 before the timer runs out. Record your final total (higher is better).	Reach 121	countdown 5
+Arena	PLAYTEST: Roll a D20 until you roll a 14. Record how many rolls it took (fewer is better).	10 rolls or fewer
+Shops	PLAYTEST: Cumulatively roll 88 or above on a D20 before the timer runs out. Record your final total (higher is better).	Reach 88	countdown 5
+Beeches	PLAYTEST: Roll a D20 until you roll a 19. The clock is running — record your time (faster is better).	Under 3:30	countup
+RPG Glade	PLAYTEST: Roll a D20 until you roll an 11. Record how many rolls it took (fewer is better).	6 rolls or fewer
+Meadow	PLAYTEST: Cumulatively roll 132 or above on a D20 before the timer runs out. Record your final total (higher is better).	Reach 132	countdown 10
+Willows 1	PLAYTEST: Roll a D20 until you roll an 18. The clock is running — record your time (faster is better).	Under 3:00	countup
+Willows 4	PLAYTEST: Cumulatively roll 104 or above on a D20 before the timer runs out. Record your final total (higher is better).	Reach 104	countdown 5
+Willows 5	PLAYTEST: Roll a D20 until you roll a 13. Record how many rolls it took (fewer is better).	8 rolls or fewer
+Willows 2	PLAYTEST: Roll a D20 until you roll a 16. The clock is running — record your time (faster is better).	Under 2:30	countup
+Birches 1	PLAYTEST: Cumulatively roll 150 or above on a D20 before the timer runs out. Record your final total (higher is better).	Reach 150	countdown 10
+Birches 2	PLAYTEST: Roll a D20 until you roll a 15. Record how many rolls it took (fewer is better).	12 rolls or fewer
+Birches 3	PLAYTEST: Roll a D20 until you roll a 17. The clock is running — record your time (faster is better).	Under 2:00	countup
+Oaks 1	PLAYTEST: Cumulatively roll 99 or above on a D20 before the timer runs out. Record your final total (higher is better).	Reach 99	countdown 5
+Oaks 2	PLAYTEST: Roll a D20 until you roll a 12. Record how many rolls it took (fewer is better).	7 rolls or fewer
+Oaks 3	PLAYTEST: Cumulatively roll 117 or above on a D20 before the timer runs out. Record your final total (higher is better).	Reach 117	countdown 5
+Oaks 4	PLAYTEST: Roll a D20 until you roll a 20. The clock is running — record your time (faster is better).	Under 5:00	countup
+Chestnut	PLAYTEST: Cumulatively roll 140 or above on a D20 before the timer runs out. Record your final total (higher is better).	Reach 140	countdown 10
