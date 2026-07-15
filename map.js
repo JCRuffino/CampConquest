@@ -261,13 +261,16 @@ function handleAreaClick(area, latlng) {
         '<div style="font-size:12px;color:#374151;margin-top:4px;line-height:1.5;">' +
           esc(area.challenge || 'No challenge set') + '</div>' +
       '</div>';
-    if (passMark) {
+    // A stealing team is NOT shown the pass mark or the score to beat —
+    // they attempt blind and only learn the owner's result after
+    // committing their own
+    if (passMark && (isUnclaimed || isMine || admin)) {
       body +=
         '<div style="font-size:12px;color:#374151;margin-top:6px;">' +
           '<span style="font-weight:700;">🎯 Pass mark:</span> ' + esc(passMark) +
         '</div>';
     }
-    if (!isUnclaimed) {
+    if (!isUnclaimed && (isMine || admin)) {
       body +=
         '<div style="font-size:12px;color:#374151;margin-top:6px;">' +
           '<span style="font-weight:700;">🏅 Result to beat:</span> ' +
@@ -348,11 +351,12 @@ function handleAreaClick(area, latlng) {
           '<div id="attempt-timer" style="font-size:22px;font-weight:800;">—</div>' +
         '</div>';
     }
-    const verb = isUnclaimed ? '⛺ We Passed — Claim!' : '😈 We Beat It — Steal &amp; Lock!';
+    const verb = isUnclaimed ? '⛺ We Passed — Claim!' : '🏁 We\'re Done — Enter Our Result';
     actionsHTML =
       '<button id="claim-btn" class="btn btn-full" style="margin-top:10px;background:' +
       states[myTeam].color + ';">' + verb + '</button>' +
-      '<button id="fail-btn" class="btn btn-neutral btn-full" style="margin-top:6px;">❌ We Failed</button>';
+      '<button id="fail-btn" class="btn btn-neutral btn-full" style="margin-top:6px;">' +
+        (isUnclaimed ? '❌ We Failed' : '❌ We Failed / Gave Up') + '</button>';
   }
 
   const content = document.createElement('div');
@@ -410,27 +414,49 @@ function handleAreaClick(area, latlng) {
 
   const claimBtn = content.querySelector('#claim-btn');
   if (claimBtn) claimBtn.addEventListener('click', async () => {
-    const confirmMsg = isUnclaimed
-      ? '⛺ Claim ' + area.name + '?\n\nOnly press this if your team genuinely reached the pass mark' +
-        (passMark ? ' (' + passMark + ')' : '') + '!'
-      : '😈 Steal ' + area.name + '?\n\nOnly press this if your team genuinely BEAT the result "' +
-        (a.result || '—') + '".\nStolen areas lock permanently!';
-    if (!window.confirm(confirmMsg)) return;
-
     // For count-up challenges the elapsed time IS the natural result
     let suggested = '';
     if (area.timer && area.timer.mode === 'up' && attempt) {
       suggested = formatCountdown(Date.now() - attempt.startedAt);
     }
+
+    if (isUnclaimed) {
+      if (!window.confirm(
+        '⛺ Claim ' + area.name + '?\n\nOnly press this if your team genuinely reached the pass mark' +
+        (passMark ? ' (' + passMark + ')' : '') + '!'
+      )) return;
+      const result = window.prompt(
+        '🏅 What result did your team get?\n(e.g. "14 catches", "3:38" — this is what others must beat)',
+        suggested
+      );
+      if (result === null) return;
+      const trimmed = result.trim().slice(0, 60);
+      if (!trimmed) { showError('You must record a result.'); return; }
+      const res = await claimArea(key, myTeam, expected, trimmed);
+      if (!res.ok) { showError(res.reason || ''); return; }
+      map.closePopup();
+      return;
+    }
+
+    // Steal: commit your result BLIND, then the owner's score is
+    // revealed and the comparison settles the duel either way
     const result = window.prompt(
-      '🏅 What result did your team get?\n(e.g. "14 catches", "3:38" — this is what others must beat)',
+      '🏅 What result did your team get?\n\nBe honest — you\'ll find out what you were up against next…',
       suggested
     );
     if (result === null) return;
     const trimmed = result.trim().slice(0, 60);
     if (!trimmed) { showError('You must record a result.'); return; }
 
-    const res = await claimArea(key, myTeam, expected, trimmed);
+    const beat = window.confirm(
+      '🥁 The score to beat was:\n\n    "' + (a.result || '—') + '" (' + teamName(gs, a.owner) + ')\n\n' +
+      'Your result: "' + trimmed + '"\n\n' +
+      'Did you BEAT it?\n\nOK = yes, we beat it — steal and lock the area.\n' +
+      'Cancel = no — the area locks for ' + teamName(gs, a.owner) + '.'
+    );
+    const res = beat
+      ? await claimArea(key, myTeam, expected, trimmed)
+      : await failChallenge(key, myTeam, expected);
     if (!res.ok) { showError(res.reason || ''); return; }
     map.closePopup();
   });
