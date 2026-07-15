@@ -33,7 +33,7 @@ function updateLeaderboard(gs) {
       winnerEl.style.display = 'block';
       winnerEl.style.background = states[gs.winner.team].color;
       winnerEl.textContent = '🏆 ' + teamName(gs, gs.winner.team) +
-        ' controls the majority of the campsite and WINS!';
+        ' reached the winning score and WINS!';
     } else {
       winnerEl.style.display = 'none';
     }

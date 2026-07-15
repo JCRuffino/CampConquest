@@ -161,18 +161,19 @@ export function largestCluster(gs, team) {
   return best;
 }
 
-// ── MAJORITY WIN ──────────────────────────────────────────────────
-// A team that ever controls MORE THAN HALF of all areas (locked or
-// not) wins on the spot. Returns { team, count, total } or null.
-export function majorityWinner(gs) {
-  const counts = { 1: 0, 2: 0, 3: 0 };
-  let total = 0;
-  Object.values(gs.areas || {}).forEach(a => {
-    total++;
-    if (a.owner) counts[a.owner]++;
-  });
+// ── INSTANT WIN ───────────────────────────────────────────────────
+// The winning post is more than half the areas' worth of points
+// (11 with 20 areas) — and BONUS points count towards it, so a team
+// can win on the spot with fewer areas plus completed sets.
+export function winThreshold(gs) {
+  return Math.floor(Object.keys(gs.areas || {}).length / 2) + 1;
+}
+
+export function instantWinner(gs) {
+  const { score } = getScores(gs);
+  const threshold = winThreshold(gs);
   for (const t of [1, 2, 3]) {
-    if (counts[t] > total / 2) return { team: t, count: counts[t], total };
+    if (score[t] >= threshold) return { team: t, score: score[t], threshold };
   }
   return null;
 }
@@ -190,7 +191,7 @@ export function gameOverGuard(gs) {
   if (!isGameOver(gs)) return false;
   if (gs.winner) {
     window.alert('🏆 The game is over — ' + teamName(gs, gs.winner.team) +
-      ' took control of the majority of the campsite!');
+      ' reached the winning score!');
   } else {
     window.alert('⏱️ The game has ended!\n\nNo more areas can be claimed or stolen.\nCheck the leaderboard for the final standings.');
   }

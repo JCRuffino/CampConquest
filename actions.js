@@ -6,7 +6,7 @@
 // silently overwriting.
 
 import { mutateState, pushLog } from './firebase.js';
-import { gameState, teamName, gameOverGuard, largestCluster, majorityWinner,
+import { gameState, teamName, gameOverGuard, largestCluster, instantWinner,
          playerNames } from './shared.js';
 
 // Complete the challenge → claim an unclaimed area, recording the result
@@ -58,8 +58,8 @@ export async function claimArea(key, team, expected, result) {
     a.era      = (a.era || 0) + 1; // stale attempts no longer count as in-progress
     delete a.attemptingBy;
 
-    // Controlling more than half the areas wins immediately
-    winInfo = majorityWinner(gs);
+    // Hitting the winning score (bonus points included) ends the game
+    winInfo = instantWinner(gs);
     if (winInfo) gs.winner = { team: winInfo.team, at: Date.now() };
     return gs;
   });
@@ -92,8 +92,8 @@ export async function claimArea(key, team, expected, result) {
       team,
       type: 'timer',
       big:  true,
-      message: '🏆 ' + teamName(gs, team) + ' controls ' + winInfo.count + ' of ' +
-               winInfo.total + ' areas — a MAJORITY. THEY WIN THE GAME!',
+      message: '🏆 ' + teamName(gs, team) + ' has reached ' + winInfo.score +
+               ' points — THEY WIN THE GAME!',
     });
     return { ok: true };
   }
@@ -276,10 +276,10 @@ export async function adminSetArea(key, fields) {
     // started and wandered off without resolving)
     delete a.attemptingBy;
 
-    // Recompute the majority win, so a mistaken claim that "won" the
+    // Recompute the instant win, so a mistaken claim that "won" the
     // game can be undone (or a correction can trigger the win)
     const hadWinner = gs.winner ? gs.winner.team : null;
-    const now       = majorityWinner(gs);
+    const now       = instantWinner(gs);
     if (now) gs.winner = { team: now.team, at: (gs.winner && gs.winner.at) || Date.now() };
     else if (gs.winner) delete gs.winner;
     const hasWinner = now ? now.team : null;
@@ -305,7 +305,7 @@ export async function adminSetArea(key, fields) {
       type: 'timer',
       big:  true,
       message: winnerChange.to
-        ? '🏆 After the admin correction, ' + teamName(gs, winnerChange.to) + ' holds a majority and WINS!'
+        ? '🏆 After the admin correction, ' + teamName(gs, winnerChange.to) + ' has the winning score and WINS!'
         : '⚙️ Admin correction: the previous win no longer stands — the game is back on!',
     });
   }

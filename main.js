@@ -2,7 +2,7 @@ import { pushState, mutateState, pushLog, listenToGameState, clearLog, listenToL
 import { initMap, addAreas, getMap } from './map.js';
 import { initSettings } from './settings.js';
 import { renderAll } from './ui.js';
-import { allAreas, gameState, fixArrays, toKey, esc, states,
+import { allAreas, gameState, fixArrays, toKey, esc, states, bonusSets,
          formatCountdown, getGameCode, setGameCode, normalizeGameCode } from './shared.js';
 import { areaDefinitions } from './areas.js';
 
@@ -290,6 +290,19 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       addAreas(allAreas);
+
+      // ── Map key: the bonus points, always in view ──────────────
+      const keyBody   = document.getElementById('map-key-body');
+      const keyToggle = document.getElementById('map-key-toggle');
+      const threshold = Math.floor(allAreas.length / 2) + 1;
+      keyBody.innerHTML =
+        '<div>1 pt per area, plus:</div>' +
+        bonusSets.map(s => '<div>' + s.emoji + ' ' + esc(s.label) + ' <strong>+1</strong></div>').join('') +
+        '<div>🔗 Most connected <strong>+1</strong></div>' +
+        '<div class="key-win">🏆 First to ' + threshold + ' pts wins!</div>';
+      keyToggle.addEventListener('click', () => {
+        keyBody.style.display = keyBody.style.display === 'none' ? 'block' : 'none';
+      });
 
       // ── Firebase listener ──────────────────────────────────────
       listenToGameState((data) => {

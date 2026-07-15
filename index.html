@@ -110,6 +110,44 @@
     #screen-leaderboard { padding: 14px; background: #f0f2f5; }
     #screen-settings { padding: 0; background: #f0f2f5; }
 
+    /* ── MAP KEY (bonus points) ─────────────────────────────────── */
+    #map-key {
+      position: absolute;
+      bottom: 28px; left: 10px;
+      z-index: 1000;
+      max-width: min(62vw, 250px);
+    }
+    #map-key-toggle {
+      background: #111827;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      font-family: inherit;
+    }
+    #map-key-body {
+      background: white;
+      border-radius: 12px;
+      padding: 8px 10px;
+      margin-top: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #374151;
+      line-height: 1.7;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    #map-key-body .key-win {
+      border-top: 1px solid #f3f4f6;
+      margin-top: 4px;
+      padding-top: 4px;
+      font-weight: 800;
+      color: #111827;
+    }
+
     /* ── MAP SCOREBOARD ─────────────────────────────────────────── */
     #map-scoreboard {
       position: absolute;
@@ -426,6 +464,10 @@
   <div id="screen-map" class="screen active">
     <div id="map"></div>
     <div id="map-scoreboard"></div>
+    <div id="map-key">
+      <button id="map-key-toggle">★ Points</button>
+      <div id="map-key-body"></div>
+    </div>
   </div>
 
   <!-- LEADERBOARD -->
@@ -572,7 +614,7 @@
             <p>Score the most points! You get <strong>1 point per area</strong> you control, plus bonus points:</p>
             <p><strong>+1</strong> for owning all the Birches · <strong>+1</strong> for all the Willows · <strong>+1</strong> for all the Oaks · <strong>+1</strong> for both Glades (RPG + SD) · <strong>+1</strong> for having the biggest connected group of touching areas (if teams tie for biggest, nobody gets it).</p>
             <p>Areas that touch each other count as connected; areas separated by a hatched grey gap do not. Locked and unlocked areas are worth the same.</p>
-            <p><strong>Instant win:</strong> if a team ever controls <strong>more than half of all areas</strong>, the game ends immediately and they win.</p>
+            <p><strong>Instant win:</strong> if a team's score ever reaches <strong>11 points</strong> — and bonus points count towards this — the game ends immediately and they win.</p>
           </div>
         </div>
 
@@ -618,7 +660,7 @@
         <div class="accordion-item">
           <button class="accordion-btn">🏆 Winning</button>
           <div class="accordion-body">
-            <p><strong>Instant win:</strong> control more than half of all areas at any moment (locked or not) and the game ends on the spot — the app announces it.</p>
+            <p><strong>Instant win:</strong> reach 11 points at any moment — bonus points included — and the game ends on the spot; the app announces it.</p>
             <p><strong>Timer win:</strong> when the countdown ends, the highest <strong>score</strong> wins — areas owned plus bonus points (the full sets and the biggest connected group). Ties are broken by locked areas.</p>
           </div>
         </div>
