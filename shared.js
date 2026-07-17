@@ -160,7 +160,7 @@ export function largestCluster(gs, team) {
 // ── INSTANT WIN ───────────────────────────────────────────────────
 // The winning post is more than half the areas' worth of points
 // (11 with 20 areas) — and BONUS points count towards it, so a team
-// can win on the spot with fewer areas plus completed sets.
+// can win on the spot with fewer areas plus bonuses.
 export function winThreshold(gs) {
   return Math.floor(Object.keys(gs.areas || {}).length / 2) + 1;
 }
@@ -230,13 +230,14 @@ export function sanitiseForFirebase(obj) {
 }
 
 // ── SCORING ───────────────────────────────────────────────────────
-// Score = 1 point per area owned, +1 for each completed set below,
-// +1 for the (uniquely) biggest connected group of areas.
+// Score = 1 point per area owned, +1 for owning the MOST areas of each
+// group below (ties award nobody), +1 for the (uniquely) biggest
+// connected group of areas.
 export const bonusSets = [
-  { label: 'All the Birches', emoji: '🌲', names: ['Birches 1', 'Birches 2', 'Birches 3'] },
-  { label: 'All the Willows', emoji: '🌿', names: ['Willows 1', 'Willows 2', 'Willows 4', 'Willows 5'] },
-  { label: 'All the Oaks',    emoji: '🌳', names: ['Oaks 1', 'Oaks 2', 'Oaks 3', 'Oaks 4'] },
-  { label: 'Both Glades',     emoji: '🏕️', names: ['RPG Glade', 'SD Glade'] },
+  { label: 'Most Birches', emoji: '🌲', names: ['Birches 1', 'Birches 2', 'Birches 3'] },
+  { label: 'Most Willows', emoji: '🌿', names: ['Willows 1', 'Willows 2', 'Willows 4', 'Willows 5'] },
+  { label: 'Most Oaks',    emoji: '🌳', names: ['Oaks 1', 'Oaks 2', 'Oaks 3', 'Oaks 4'] },
+  { label: 'Most Glades',  emoji: '🏕️', names: ['RPG Glade', 'SD Glade'] },
 ];
 
 // Returns { counts, locked, cluster, bonuses (labels per team), score }
@@ -255,14 +256,16 @@ export function getScores(gs) {
   };
 
   const bonuses = { 1: [], 2: [], 3: [] };
-  [1, 2, 3].forEach(t => {
-    bonusSets.forEach(set => {
-      const ownsAll = set.names.every(n => {
-        const a = gs.areas && gs.areas[toKey(n)];
-        return a && a.owner === t;
-      });
-      if (ownsAll) bonuses[t].push(set.emoji + ' ' + set.label);
+  bonusSets.forEach(set => {
+    const held = { 1: 0, 2: 0, 3: 0 };
+    set.names.forEach(n => {
+      const a = gs.areas && gs.areas[toKey(n)];
+      if (a && held[a.owner] !== undefined) held[a.owner]++;
     });
+    const max = Math.max(held[1], held[2], held[3]);
+    if (max === 0) return;
+    const leaders = [1, 2, 3].filter(t => held[t] === max);
+    if (leaders.length === 1) bonuses[leaders[0]].push(set.emoji + ' ' + set.label);
   });
 
   // Biggest connected group: +1, but only for a unique winner

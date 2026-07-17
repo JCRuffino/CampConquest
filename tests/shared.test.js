@@ -60,13 +60,41 @@ test('largestCluster counts connected groups, not totals', () => {
   assert.equal(largestCluster(gs, 2), 0);
 });
 
-test('set bonuses: all Birches = +1', () => {
+test('group bonuses: owning all Birches = +1', () => {
   const gs = makeState({ 'Birches 1': 2, 'Birches 2': 2, 'Birches 3': 2 });
   const { counts, bonuses, score } = getScores(gs);
   assert.equal(counts[2], 3);
-  assert.equal(bonuses[2].length, 2); // set bonus + most connected (unique)
+  assert.equal(bonuses[2].length, 2); // group bonus + most connected (unique)
   assert.ok(bonuses[2].some(b => b.includes('Birches')));
   assert.equal(score[2], 5);
+});
+
+test('group bonuses: a majority (not the full group) still earns it', () => {
+  const gs = makeState({ 'Birches 1': 1, 'Birches 2': 1, 'Birches 3': 2 });
+  const { bonuses } = getScores(gs);
+  assert.ok(bonuses[1].some(b => b.includes('Birches')));
+  assert.ok(!bonuses[2].some(b => b.includes('Birches')));
+});
+
+test('group bonuses: a tie within a group awards nobody', () => {
+  const gs = makeState({ 'RPG Glade': 1, 'SD Glade': 2 });
+  const { bonuses } = getScores(gs);
+  assert.ok(!bonuses[1].some(b => b.includes('Glades')));
+  assert.ok(!bonuses[2].some(b => b.includes('Glades')));
+});
+
+test('group bonuses: a single area beats rivals holding none', () => {
+  const gs = makeState({ 'Oaks 2': 3 });
+  const { bonuses, score } = getScores(gs);
+  assert.ok(bonuses[3].some(b => b.includes('Oaks')));
+  assert.equal(score[3], 3); // 1 area + Most Oaks + most connected
+});
+
+test('group bonuses: a fully unclaimed group awards nobody', () => {
+  const gs = makeState({ 'Meadow': 1 });
+  const { bonuses } = getScores(gs);
+  assert.ok(!bonuses[1].some(b => b.includes('Oaks')));
+  assert.ok(!bonuses[1].some(b => b.includes('Birches')));
 });
 
 test('most-connected bonus is withheld on a tie', () => {
@@ -85,7 +113,7 @@ test('winThreshold is 11 with 21 areas', () => {
 });
 
 test('instantWinner fires on points including bonuses', () => {
-  // 9 areas + 3 set bonuses (Oaks, Birches, both Glades) + most
+  // 9 areas + 3 group bonuses (most Oaks, Birches, Glades) + most
   // connected = 13 ≥ 11
   const owners = {
     'Oaks 1': 1, 'Oaks 2': 1, 'Oaks 3': 1, 'Oaks 4': 1,
@@ -104,10 +132,11 @@ test('instantWinner stays null below the post', () => {
 });
 
 test('rankTeams breaks score ties by locked areas', () => {
-  const gs = makeState({ 'Oaks 1': 1, 'Meadow': 2 });
+  // Chapel and Meadow are in no bonus group, so both teams have 1 pt
+  // (clusters tie at 1 → no bonus); team 2's area is locked
+  const gs = makeState({ 'Chapel': 1, 'Meadow': 2 });
   gs.areas[toKey('Meadow')].locked = true;
   const order = rankTeams(gs);
-  // both have 1 pt (clusters tie at 1 → no bonus); team 2's is locked
   assert.equal(order[0], 2);
 });
 

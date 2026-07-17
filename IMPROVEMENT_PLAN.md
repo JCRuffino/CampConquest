@@ -31,8 +31,9 @@ handed to an AI coding agent (or a human). **Read the constraints first.**
 details). The P3 nice-to-haves remain open. Notes for whoever picks this up:
 
 - `node --test tests/` is the test entry point; this dev machine has no Node, so
-  the same assertions were verified via a browser harness (28/28) — run the Node
-  suite on a machine that has it.
+  `tests/browser-harness.html` runs the same test file in a browser (serve the
+  repo root and open it — an import map shims the node built-ins). Run the real
+  Node suite on a machine that has it.
 - All native dialogs were replaced by `modal.js`; the popup lives in `popup.js`,
   the shape editor in `editor.js` (map.js ↔ popup.js import cycle is
   intentional and runtime-safe).

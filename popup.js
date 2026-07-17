@@ -294,7 +294,8 @@ export function openAreaPopup(area, latlng) {
           bodyHTML:
             'The score to beat, set by <strong>' + esc(teamName(gs, a.owner)) + '</strong>:' +
             '<div style="text-align:center;font-size:18px;font-weight:800;margin:10px 0;">"' + esc(a.result || '—') + '"</div>' +
-            'Your result: <strong>"' + esc(result) + '"</strong>',
+            'Your result: <strong>"' + esc(result) + '"</strong>' +
+            '<div style="font-size:12px;color:#6b7280;margin-top:8px;">A tie is not a beat — you must do strictly better to steal.</div>',
           buttons: [
             { id: 'beat',  label: '✅ We beat it — steal &amp; lock!', color: states[myTeam].color },
             { id: 'short', label: '🛡️ We fell short — locks for ' + esc(teamName(gs, a.owner)), style: 'neutral' },

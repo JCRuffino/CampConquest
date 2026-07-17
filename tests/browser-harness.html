@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>shared.js test harness</title>
+  <!-- Runs tests/shared.test.js unmodified in a browser, for machines
+       without Node. Serve the repo root (python -m http.server) and
+       open /tests/browser-harness.html — the import map below swaps
+       the node built-ins for the shims in this folder. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "node:test": "./shim-node-test.js",
+        "node:assert/strict": "./shim-node-assert.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <pre id="results">running…</pre>
+  <script type="module">
+    import { results } from './shim-node-test.js';
+    import './shared.test.js';
+    const pass = results.filter(r => r.ok).length;
+    document.getElementById('results').textContent =
+      pass + '/' + results.length + ' passed\n\n' +
+      results.map(r =>
+        (r.ok ? 'PASS  ' : 'FAIL  ') + r.name + (r.err ? '\n      ' + r.err : '')
+      ).join('\n');
+  </script>
+</body>
+</html>
