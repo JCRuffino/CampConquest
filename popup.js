@@ -229,8 +229,15 @@ export function openAreaPopup(area, latlng) {
   if (startBtn) startBtn.addEventListener('click', async () => {
     busy = true;
     try {
+      // Predict phone duty from the current turn counter so it can be
+      // shown in the start confirmation (the transaction assigns the
+      // same one unless this team starts elsewhere at the same instant)
+      const players   = playerNames(gameState.data, myTeam);
+      const predicted = ((gameState.data.attemptTurn || {})[myTeam] || 0) % 2;
       const ok = await showConfirm(
         '▶️ Start the challenge at ' + esc(area.name) + '?',
+        '📱 <strong>' + esc(players[predicted]) + '</strong> holds the phone and reads the challenge out loud — ' +
+        '💪 <strong>' + esc(players[1 - predicted]) + '</strong> is the one who does it!<br><br>' +
         'Only start when your team is <strong>at this area</strong> and ready.<br><br>' +
         'The challenge is revealed, any timer starts immediately, and your team must then record either a pass or a fail.' +
         (isUnclaimed ? '' : '<br><br><strong>Stealing shuts the other team out — win or lose, this area locks.</strong>'),
@@ -240,9 +247,11 @@ export function openAreaPopup(area, latlng) {
       const res = await startAttempt(key, myTeam, expected);
       if (!res.ok) { showError(res.reason); return; }
       setWakeLock(true);
-      await showInfo('📱 Phone duty',
-        '<strong>' + esc(res.holder) + '</strong> holds the phone and reads the challenge out loud — ' +
-        '<strong>' + esc(res.attempter) + '</strong> is the one who does it!', 'Got it');
+      if (res.holder !== players[predicted]) {
+        await showInfo('📱 Phone duty changed',
+          '<strong>' + esc(res.holder) + '</strong> holds the phone and reads the challenge out loud — ' +
+          '<strong>' + esc(res.attempter) + '</strong> is the one who does it!', 'Got it');
+      }
     } finally {
       busy = false;
     }
