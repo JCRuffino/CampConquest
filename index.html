@@ -146,9 +146,10 @@
         <div class="settings-card-title">⏱️ Game Timer</div>
         <div class="settings-card-desc">Set a countdown for the game. When it hits zero the game ends — no more claims or locks.</div>
         <div id="timer-status" style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px;">No countdown set.</div>
-        <div id="timer-start-row" style="display:flex;gap:8px;">
-          <input id="timer-minutes" type="number" min="1" placeholder="Minutes"
-            style="flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;outline:none;" />
+        <div id="timer-start-row" style="display:flex;gap:8px;align-items:center;">
+          <button id="timer-dec-btn" class="btn btn-ghost btn-sm">−15m</button>
+          <div id="timer-length-label" style="flex:1;text-align:center;font-size:16px;font-weight:800;color:#111827;">3h 00m</div>
+          <button id="timer-inc-btn" class="btn btn-ghost btn-sm">＋15m</button>
           <button id="timer-start-btn" class="btn btn-primary">Start</button>
         </div>
         <div id="timer-adjust-row" style="display:none;flex-wrap:wrap;gap:6px;margin-top:8px;">
@@ -203,9 +204,15 @@
       </div>
 
       <div class="settings-card settings-card-danger" id="reset-card" style="display:none;">
-        <div class="settings-card-title">🔴 Reset Game (Admin)</div>
-        <div class="settings-card-desc">Full reset to start a new game — all areas back to unclaimed.</div>
-        <button id="reset-btn" class="btn btn-danger btn-full">Reset Game</button>
+        <div class="settings-card-title">🔴 Reset (Admin)</div>
+        <div class="settings-card-desc">
+          <strong>Restart Game</strong> wipes the board and history but keeps the teams and
+          their connected phones — for redoing a game with the same players.
+          <strong>Full Reset</strong> also wipes team names, rosters and disconnects every
+          phone — use it between groups so the system is ready for new players.
+        </div>
+        <button id="restart-btn" class="btn btn-amber btn-full" style="margin-bottom:8px;">🔄 Restart Game (same teams)</button>
+        <button id="reset-btn" class="btn btn-danger btn-full">🧹 Full Reset (new group)</button>
       </div>
 
     </div>

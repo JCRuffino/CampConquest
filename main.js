@@ -55,15 +55,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })();
 
-  const settings = initSettings(() => {
-    // A reset starts a fresh game but keeps the setup: team size, names
-    // and rosters survive; areas, attempts, fails, the log — and the
-    // phone-to-team claims — do not (player phones pick again)
+  const settings = initSettings((mode) => {
+    // Two flavours of reset. 'restart': same game night, same people —
+    // wipe the board/history but keep the whole setup AND the
+    // phone-to-team claims, so nobody has to re-pick. 'full': next
+    // group — wipe teams, rosters and claims too (connected phones
+    // drop off their teams); only the team-size choice carries over.
     const prev  = gameState.data || {};
     const fresh = defaultState(allAreas);
-    if (prev.teamNames) fresh.teamNames = prev.teamNames;
-    if (prev.players)   fresh.players   = prev.players;
-    if (prev.teamSize)  fresh.teamSize  = prev.teamSize;
+    if (prev.teamSize) fresh.teamSize = prev.teamSize;
+    if (mode === 'restart') {
+      if (prev.teamNames)  fresh.teamNames  = prev.teamNames;
+      if (prev.players)    fresh.players    = prev.players;
+      if (prev.teamClaims) fresh.teamClaims = prev.teamClaims;
+    }
     pushState(fresh);
     clearLog();
   });

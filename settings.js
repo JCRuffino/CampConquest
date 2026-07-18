@@ -33,6 +33,7 @@ export function initSettings(resetCallback) {
 
   let pickerOpen     = false;
   let pickerDeclined = false; // "just watching" — don't re-prompt this session
+  let kickNote       = false; // this phone was just dropped off its team
 
   async function offerTeamPick(auto) {
     if (pickerOpen) return;
@@ -42,9 +43,13 @@ export function initSettings(resetCallback) {
     pickerOpen = true;
     try {
       const gs  = gameState.data;
+      const note = kickNote
+        ? '<strong>This phone was disconnected from its team (game reset or admin release).</strong><br><br>'
+        : '';
+      kickNote = false;
       const res = await showModal({
         title: '👥 Which team is this phone for?',
-        bodyHTML: 'Each team has one phone. Pick your set of players — teams already on a phone aren\'t shown.',
+        bodyHTML: note + 'Each team has one phone. Pick your set of players — teams already on a phone aren\'t shown.',
         buttons: [
           ...avail.map(t => ({
             id:    't' + t,
@@ -126,6 +131,19 @@ export function initSettings(resetCallback) {
     return setupSizeChoice || teamSize(gameState.data);
   }
 
+  // Fields being edited are "dirty" until saved — refresh() must not
+  // clobber them when remote state changes (phones claiming/leaving
+  // teams write state while the admin is mid-typing)
+  if (setupCard) setupCard.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', () => { inp.dataset.dirty = '1'; });
+  });
+
+  function clearSetupDirty() {
+    if (setupCard) setupCard.querySelectorAll('input').forEach(inp => {
+      delete inp.dataset.dirty;
+    });
+  }
+
   function refreshSetupUI() {
     const size = selectedSize();
     document.querySelectorAll('.team-size-btn').forEach(b => {
@@ -174,7 +192,8 @@ export function initSettings(resetCallback) {
       [1, 2, 3].forEach(t => {
         const nameEl = document.getElementById('setup-teamname-' + t);
         const nm = nameEl ? nameEl.value.trim().slice(0, 12) : '';
-        if (nm) gs.teamNames[t] = nm;
+        // Blank (or the stock label) reverts the team to its default name
+        gs.teamNames[t] = (nm && nm !== states[t].label) ? nm : null;
         const roster = [];
         for (let i = 1; i <= size; i++) {
           const el = document.getElementById('setup-player-' + t + '-' + i);
@@ -185,6 +204,7 @@ export function initSettings(resetCallback) {
       });
       return gs;
     });
+    if (committed) clearSetupDirty();
     if (setupStatus) {
       setupStatus.textContent = committed ? '✅ Saved' : '❌ Not saved — still connecting? Try again.';
       setupStatus.style.color = committed ? '#2a9d3f' : '#e63946';
@@ -195,9 +215,31 @@ export function initSettings(resetCallback) {
 
   // ── Game timer ────────────────────────────────────────────────────
   const timerStatus    = document.getElementById('timer-status');
-  const timerMinutes   = document.getElementById('timer-minutes');
   const timerStartRow  = document.getElementById('timer-start-row');
   const timerAdjustRow = document.getElementById('timer-adjust-row');
+  const timerLenLabel  = document.getElementById('timer-length-label');
+
+  // Game length defaults to 3 hours; ± buttons tune it before starting
+  let pendingMinutes = 180;
+
+  function refreshTimerLength() {
+    if (timerLenLabel) {
+      timerLenLabel.textContent =
+        Math.floor(pendingMinutes / 60) + 'h ' + String(pendingMinutes % 60).padStart(2, '0') + 'm';
+    }
+  }
+
+  const timerDecBtn = document.getElementById('timer-dec-btn');
+  const timerIncBtn = document.getElementById('timer-inc-btn');
+  if (timerDecBtn) timerDecBtn.addEventListener('click', () => {
+    pendingMinutes = Math.max(15, pendingMinutes - 15);
+    refreshTimerLength();
+  });
+  if (timerIncBtn) timerIncBtn.addEventListener('click', () => {
+    pendingMinutes = Math.min(12 * 60, pendingMinutes + 15);
+    refreshTimerLength();
+  });
+  refreshTimerLength();
 
   function refreshTimerUI() {
     const gs      = gameState.data;
@@ -224,21 +266,23 @@ export function initSettings(resetCallback) {
   }
 
   document.getElementById('timer-start-btn').addEventListener('click', () => {
-    const mins = parseInt(timerMinutes.value);
-    if (isNaN(mins) || mins < 1) return;
+    if (!isAdminMode()) return;
+    const mins = pendingMinutes;
     mutateState(gs => {
       if (gs.timer && gs.timer.endsAt && Date.now() < gs.timer.endsAt) return; // already running
       gs.timer = { endsAt: Date.now() + mins * 60000 };
       return gs;
     }).then(committed => {
       if (!committed) return;
+      const h = Math.floor(mins / 60), m = mins % 60;
+      const lenText = (h ? h + 'h ' : '') + (m ? m + 'm' : (h ? '' : '0m'));
       pushLog({
         timestamp: Date.now(),
         team:      0,
         type:      'timer',
-        message:   '⏱️ Countdown started — ' + mins + ' minute' + (mins !== 1 ? 's' : '') + ' on the clock',
+        big:       true,
+        message:   '⏱️ Countdown started — ' + lenText.trim() + ' on the clock',
       });
-      timerMinutes.value = '';
     });
   });
 
@@ -420,18 +464,34 @@ export function initSettings(resetCallback) {
     });
   }
 
-  // ── Reset (admin) ─────────────────────────────────────────────────
-  const resetBtn = document.getElementById('reset-btn');
+  // ── Resets (admin) ────────────────────────────────────────────────
+  // Restart: same players, fresh board — setup and phone claims kept.
+  // Full reset: next group — teams, rosters and claims wiped too, so
+  // phones from the previous game drop off and the picker starts clean.
+  const restartBtn = document.getElementById('restart-btn');
+  const resetBtn   = document.getElementById('reset-btn');
+
+  if (restartBtn) restartBtn.addEventListener('click', async () => {
+    if (!isAdminMode()) return;
+    const ok = await showConfirm('🔄 Restart the game?',
+      'Every area goes back to unclaimed and the history is wiped. ' +
+      'Teams, rosters and connected phones all stay as they are.' +
+      '<br><br><strong>This cannot be undone.</strong>',
+      'Yes, restart', 'Cancel', 'danger');
+    if (!ok) return;
+    resetCallback('restart');
+  });
 
   resetBtn.addEventListener('click', async () => {
     if (!isAdminMode()) return;
-    const ok = await showConfirm('⚠️ Reset the ENTIRE game?',
-      'Every area goes back to unclaimed and the history is wiped. ' +
-      'The game setup (team size, names and rosters) is kept, but player ' +
-      'phones drop off their teams and pick again.<br><br><strong>This cannot be undone.</strong>',
-      'Yes, reset', 'Cancel', 'danger');
+    const ok = await showConfirm('⚠️ FULL reset for a new group?',
+      'Everything is wiped: the board, the history, team names, rosters — ' +
+      'and every phone is disconnected from its team. ' +
+      'Enter the new group in Game Setup afterwards.' +
+      '<br><br><strong>This cannot be undone.</strong>',
+      'Yes, full reset', 'Cancel', 'danger');
     if (!ok) return;
-    resetCallback();
+    resetCallback('full');
   });
 
   // ── Public API ────────────────────────────────────────────────────
@@ -440,24 +500,36 @@ export function initSettings(resetCallback) {
     const myTeam = getMyTeam();
 
     // Being on a team requires holding its claim — if it's gone
-    // (admin release, reset, or another phone took it), drop off
+    // (admin release, reset, or another phone took it), drop off and
+    // tell the player why (via the picker if teams are free, or a
+    // one-off notice after a full reset when there's nothing to pick)
     if (gs && myTeam && myUid) {
       const claims = gs.teamClaims || {};
-      if (claims[myTeam] !== myUid) setMyTeam(null);
+      if (claims[myTeam] !== myUid) {
+        setMyTeam(null);
+        pickerDeclined = false;
+        if (isAdminMode() || availableTeams().length) {
+          kickNote = true; // the picker (below) explains it
+        } else {
+          showInfo('📱 Off the team',
+            'This phone is no longer on a team — the game was reset or the admin freed it.<br>' +
+            'When the next game is set up you\'ll be asked to pick again.');
+        }
+      }
     }
 
-    // Keep the admin setup inputs in sync with the saved state
+    // Keep the admin setup inputs in sync with the saved state — but
+    // never overwrite a field being edited (focused or unsaved-dirty)
+    const canFill = el => el && !el.matches(':focus') && !el.dataset.dirty;
     const names   = (gs && gs.teamNames) || {};
     const players = (gs && gs.players)   || {};
     [1, 2, 3].forEach(t => {
       const nameInput = document.getElementById('setup-teamname-' + t);
-      if (nameInput && !nameInput.matches(':focus')) {
-        nameInput.value = names[t] || states[t].label;
-      }
+      if (canFill(nameInput)) nameInput.value = names[t] || states[t].label;
       const roster = players[t] || [];
       for (let i = 1; i <= 3; i++) {
         const el = document.getElementById('setup-player-' + t + '-' + i);
-        if (el && !el.matches(':focus')) el.value = roster[i - 1] || '';
+        if (canFill(el)) el.value = roster[i - 1] || '';
       }
     });
 
