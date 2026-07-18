@@ -38,6 +38,7 @@ export function initSettings(resetCallback) {
   async function offerTeamPick(auto) {
     if (pickerOpen) return;
     if (isAdminMode()) return; // the admin teaches, they don't play
+    if (getMyTeam()) return;   // already on a team
     const avail = availableTeams();
     if (!avail.length) return;
     pickerOpen = true;
@@ -78,9 +79,63 @@ export function initSettings(resetCallback) {
     }
   }
 
+  // ── Onboarding ────────────────────────────────────────────────────
+  // A fresh phone is asked whether it's playing, then sent to the
+  // Rules screen; the button at the bottom of the rules confirms
+  // they've been read and opens the team picker. Phones released
+  // mid-game (kickNote) skip the rules and go straight to the picker.
+  const rulesDoneBtn = document.getElementById('rules-done-btn');
+  let onboardingActive = false; // asked / reading the rules
+
+  async function startOnboarding() {
+    if (onboardingActive || pickerOpen) return;
+    if (isAdminMode() || getMyTeam()) return;
+    if (!availableTeams().length) return;
+    onboardingActive = true;
+    const res = await showModal({
+      title: '🏕️ Playing in the next game?',
+      bodyHTML: 'Is this phone for a team in the next game?',
+      buttons: [
+        { id: 'play',  label: '🎮 Yes, we\'re playing', style: 'primary' },
+        { id: 'watch', label: '👀 Just watching',       style: 'ghost' },
+      ],
+      dismissable: true,
+    });
+    if (!res || res.button !== 'play') {
+      pickerDeclined   = true;
+      onboardingActive = false;
+      return;
+    }
+    await showInfo('📖 Read the rules first',
+      'Read through every section with your team and ask the admin any questions — ' +
+      'then press the button at the bottom of the rules to join your team.',
+      'Open the rules');
+    document.querySelector('.nav-btn[data-screen="rules"]').click();
+    if (rulesDoneBtn) rulesDoneBtn.style.display = 'block';
+    // onboardingActive stays true until the rules are confirmed
+  }
+
+  if (rulesDoneBtn) rulesDoneBtn.addEventListener('click', async () => {
+    if (getMyTeam()) { rulesDoneBtn.style.display = 'none'; return; }
+    const ok = await showConfirm('✅ All read?',
+      'Confirm your team has read the rules and asked any questions.',
+      'Yes — choose our team', 'Keep reading');
+    if (!ok) return;
+    if (!availableTeams().length) {
+      await showInfo('😬 No teams free',
+        'All teams are already on a phone — check with the admin.');
+      return;
+    }
+    rulesDoneBtn.style.display = 'none';
+    onboardingActive = false;
+    await offerTeamPick(false);
+    if (getMyTeam()) document.querySelector('.nav-btn[data-screen="map"]').click();
+  });
+
   function refreshTeamUI() {
     const myTeam = getMyTeam();
     const gs     = gameState.data;
+    if (rulesDoneBtn && myTeam) rulesDoneBtn.style.display = 'none';
     if (myTeam) {
       currentLabel.textContent = '✅ You are on ' + teamName(gs, myTeam) +
         ' — ' + playerNames(gs, myTeam).join(' & ');
@@ -98,7 +153,7 @@ export function initSettings(resetCallback) {
 
   if (pickBtn) pickBtn.addEventListener('click', () => {
     pickerDeclined = false;
-    offerTeamPick(false);
+    startOnboarding(); // playing? → rules → picker
   });
 
   if (leaveBtn) leaveBtn.addEventListener('click', async () => {
@@ -534,10 +589,11 @@ export function initSettings(resetCallback) {
 
     refreshTeamUI();
 
-    // A phone with no team gets offered the free teams (once per
-    // session, unless it asks again via the Choose button)
+    // A phone with no team is onboarded (playing? → rules → picker);
+    // a phone that was released mid-game re-picks without the rules
     if (gs && !getMyTeam() && !isAdminMode() && !pickerDeclined) {
-      offerTeamPick(true);
+      if (kickNote) offerTeamPick(true);
+      else startOnboarding();
     }
   }
 
