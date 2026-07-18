@@ -2,7 +2,7 @@
 
 A real-time multiplayer territory game played across a campsite, inspired by Jet Lag: The Game's Battle for America / Schengen Showdown — and a follow-up to [BussyBodies](https://github.com/JCRuffino/BussyBodies) (Jet Lag Brighton).
 
-Three teams of two compete over the 21 zones of the Strange Games Festival at Bushy Wood Activity Centre. Every zone has one secret challenge, revealed only when a team presses Start Challenge Attempt there — which commits them to recording a pass (reaching the pass mark) or a fail (barred from that area for the rest of the game). Some challenges secretly run on a countdown or stopwatch that starts the moment the attempt does. Claiming records your **result**; another team can steal the zone by beating that result — but a stolen zone **locks permanently**. A team that ever reaches 11 points (bonus points count) wins instantly. Otherwise the highest score at the countdown wins: 1 point per zone, +1 each for owning the most Birches, the most Willows, the most Oaks, or the most Glades, and +1 for the biggest connected group of touching zones — any bonus that ends in a tie is awarded to nobody, and score ties are broken by locked zones, then total zones. A steal attempt is a one-shot duel: the first rival to start it shuts out the third team, and a failed steal locks the zone for its owner.
+Three teams of two or three (chosen by the admin at game setup) compete over the 21 zones of the Strange Games Festival at Bushy Wood Activity Centre. Every zone has one secret challenge, revealed only when a team presses Start Challenge Attempt there — which commits them to recording a pass (reaching the pass mark) or a fail (barred from that area for the rest of the game). Some challenges secretly run on a countdown or stopwatch that starts the moment the attempt does. Claiming records your **result**; another team can steal the zone by beating that result — but a stolen zone **locks permanently**. A team that ever reaches 11 points (bonus points count) wins instantly. Otherwise the highest score at the countdown wins: 1 point per zone, +1 each for owning the most Birches, the most Willows, the most Oaks, or the most Glades, and +1 for the biggest connected group of touching zones — any bonus that ends in a tie is awarded to nobody, and score ties are broken by locked zones, then total zones. A steal attempt is a one-shot duel: the first rival to start it shuts out the third team, and a failed steal locks the zone for its owner.
 
 Built with vanilla JavaScript (ES modules), [Leaflet](https://leafletjs.com/) + OpenStreetMap, and Firebase (anonymous auth + Realtime Database) for shared state.
 
@@ -11,9 +11,9 @@ Built with vanilla JavaScript (ES modules), [Leaflet](https://leafletjs.com/) + 
 - `index.html` — markup and styles for all screens (Map, Leaderboard, Settings, Rules, History)
 - `main.js` — boot sequence: data loading, Firebase listener, navigation, history screen, timer ticker, toasts
 - `map.js` — Leaflet map, area polygons, challenge popups with live attempt timers, live player locations, admin vertex-drag area editor
-- `actions.js` — the start-attempt / claim / steal / fail / admin state changes (Firebase transactions)
+- `actions.js` — the start-attempt / claim / steal / fail / team-claim / admin state changes (Firebase transactions)
 - `ui.js` — leaderboard and map scoreboard
-- `settings.js` — team assignment, team renaming, game code, game timer, admin unlock (password in this file), area editor toggle, game reset
+- `settings.js` — admin game setup (team size, team names, player rosters), the phone-to-team picker, game code, game timer, admin unlock (password in this file), area editor toggle, game reset
 - `firebase.js` — Firebase setup, transactional state updates, game log
 - `shared.js` — game state helpers, win detection, and constants shared across modules
 - `areas.js` — the 20 festival zones as named polygons plus the connections between them (which drive the largest-connected-group score); zones are expanded so neighbours visibly touch
@@ -71,4 +71,4 @@ Then open the printed local URL in a browser. For the real game, host it anywher
 
 Open the Rules tab in the app for the full rules. In short: a zone's challenge stays secret until you press Start at it (which commits you to a pass or fail and starts any timer), pass to claim it with a recorded result, and steal rivals' zones by beating that result — stolen zones lock forever. The winner is the team with the highest score when the countdown ends (ties: locked zones, then total zones).
 
-Admin mode (unlocked per device with the password in `settings.js`) can see all challenges, adjust the timer, set any area's owner/lock/result/pass mark from the map popup, edit zone shapes, and reset the game.
+Admin mode (unlocked per device with the password in `settings.js`) sets up the teams (size, names and rosters — player phones then claim a free team when they connect), and can see all challenges, adjust the timer, set any area's owner/lock/result/pass mark from the map popup, edit zone shapes, and reset the game.

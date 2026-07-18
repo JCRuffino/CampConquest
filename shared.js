@@ -62,10 +62,15 @@ export function teamName(gs, i) {
   return names[i] || states[i].label;
 }
 
-// The two players on a team (entered when the team is joined)
+// The players on a team (entered by the admin in Game Setup)
 export function playerNames(gs, team) {
-  const p = (gs && gs.players && gs.players[team]) || [];
-  return [p[0] || 'Player 1', p[1] || 'Player 2'];
+  const p = ((gs && gs.players && gs.players[team]) || []).filter(n => n);
+  return p.length ? p : ['Player 1', 'Player 2'];
+}
+
+// Players per team — 2 or 3, chosen by the admin in Game Setup
+export function teamSize(gs) {
+  return gs && gs.teamSize === 3 ? 3 : 2;
 }
 
 // ── ADMIN MODE ────────────────────────────────────────────────────

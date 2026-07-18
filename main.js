@@ -56,12 +56,14 @@ document.addEventListener('DOMContentLoaded', () => {
   })();
 
   const settings = initSettings(() => {
-    // A reset starts a fresh game but keeps the people: team names and
-    // player rosters survive; areas, attempts, fails and the log do not
+    // A reset starts a fresh game but keeps the setup: team size, names
+    // and rosters survive; areas, attempts, fails, the log — and the
+    // phone-to-team claims — do not (player phones pick again)
     const prev  = gameState.data || {};
     const fresh = defaultState(allAreas);
     if (prev.teamNames) fresh.teamNames = prev.teamNames;
     if (prev.players)   fresh.players   = prev.players;
+    if (prev.teamSize)  fresh.teamSize  = prev.teamSize;
     pushState(fresh);
     clearLog();
   });

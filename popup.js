@@ -3,10 +3,10 @@
 // blind steal verdicts, and the admin's per-area controls. The open
 // popup re-renders itself when the area's state changes remotely.
 
-import { states, gameState, toKey, getMyTeam, esc, teamName, playerNames,
+import { states, gameState, toKey, getMyTeam, esc, teamName,
          hasStarted, getCurrentAttempt, isAdminMode, formatCountdown } from './shared.js';
 import { claimArea, failChallenge, startAttempt, adminSetArea, adminClearAttempt } from './actions.js';
-import { showModal, showInfo, showConfirm, showPrompt } from './modal.js';
+import { showModal, showConfirm, showPrompt } from './modal.js';
 import { setWakeLock } from './wakelock.js';
 import { getMap, getAreaLayers } from './map.js';
 
@@ -157,16 +157,7 @@ export function openAreaPopup(area, latlng) {
         (isUnclaimed ? '' : ' Stealing shuts the other team out — win or lose, this area locks.') +
       '</div>';
   } else {
-    // Attempt in progress — phone-duty reminder, timer (if any), and
-    // resolve buttons
-    const players = playerNames(gs, myTeam);
-    const holder  = players[attempt.holder || 0];
-    const doer    = players[1 - (attempt.holder || 0)];
-    body +=
-      '<div style="font-size:12px;color:#374151;font-weight:600;margin-top:8px;' +
-        'background:#fef3c7;border-radius:8px;padding:6px 8px;">' +
-        '📱 ' + esc(holder) + ' holds the phone and reads aloud — 💪 ' + esc(doer) + ' does the challenge!' +
-      '</div>';
+    // Attempt in progress — timer (if any) and resolve buttons
     if (area.timer) {
       const timerLabel = area.timer.mode === 'down'
         ? area.timer.minutes + '-minute countdown'
@@ -229,15 +220,8 @@ export function openAreaPopup(area, latlng) {
   if (startBtn) startBtn.addEventListener('click', async () => {
     busy = true;
     try {
-      // Predict phone duty from the current turn counter so it can be
-      // shown in the start confirmation (the transaction assigns the
-      // same one unless this team starts elsewhere at the same instant)
-      const players   = playerNames(gameState.data, myTeam);
-      const predicted = ((gameState.data.attemptTurn || {})[myTeam] || 0) % 2;
       const ok = await showConfirm(
         '▶️ Start the challenge at ' + esc(area.name) + '?',
-        '📱 <strong>' + esc(players[predicted]) + '</strong> holds the phone and reads the challenge out loud — ' +
-        '💪 <strong>' + esc(players[1 - predicted]) + '</strong> is the one who does it!<br><br>' +
         'Only start when your team is <strong>at this area</strong> and ready.<br><br>' +
         'The challenge is revealed, any timer starts immediately, and your team must then record either a pass or a fail.' +
         (isUnclaimed ? '' : '<br><br><strong>Stealing shuts the other team out — win or lose, this area locks.</strong>'),
@@ -247,11 +231,6 @@ export function openAreaPopup(area, latlng) {
       const res = await startAttempt(key, myTeam, expected);
       if (!res.ok) { showError(res.reason); return; }
       setWakeLock(true);
-      if (res.holder !== players[predicted]) {
-        await showInfo('📱 Phone duty changed',
-          '<strong>' + esc(res.holder) + '</strong> holds the phone and reads the challenge out loud — ' +
-          '<strong>' + esc(res.attempter) + '</strong> is the one who does it!', 'Got it');
-      }
     } finally {
       busy = false;
     }

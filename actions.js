@@ -5,9 +5,9 @@
 // from, so if another team acted first the action aborts instead of
 // silently overwriting.
 
-import { mutateState, pushLog } from './firebase.js';
+import { mutateState, pushLog, getUid } from './firebase.js';
 import { gameState, teamName, gameOverGuard, largestCluster, instantWinner,
-         playerNames } from './shared.js';
+         playerNames, isAdminMode } from './shared.js';
 
 // Complete the challenge → claim an unclaimed area, recording the result
 // other teams will have to beat. Stealing (owner !== 0) locks the area.
@@ -192,7 +192,6 @@ export async function startAttempt(key, team, expected) {
   if (gameOverGuard(gameState.data)) return { ok: false, reason: null };
 
   let failReason = '';
-  let holderIdx  = 0;
 
   const committed = await mutateState(gs => {
     const a = gs.areas && gs.areas[key];
@@ -227,17 +226,9 @@ export async function startAttempt(key, team, expected) {
       return;
     }
     a.attemptingBy = team;
-    // Phone duty alternates with each challenge the team attempts: one
-    // player holds the phone and reads the challenge aloud, the other
-    // one does it
-    if (!gs.attemptTurn) gs.attemptTurn = {};
-    const turn = gs.attemptTurn[team] || 0;
-    gs.attemptTurn[team] = turn + 1;
-    holderIdx = turn % 2;
-
     if (!gs.attempts) gs.attempts = {};
     if (!gs.attempts[team]) gs.attempts[team] = {};
-    gs.attempts[team][key] = { startedAt: Date.now(), era: a.era || 0, holder: holderIdx };
+    gs.attempts[team][key] = { startedAt: Date.now(), era: a.era || 0 };
     return gs;
   });
 
@@ -258,12 +249,58 @@ export async function startAttempt(key, team, expected) {
       : '▶️ ' + teamName(gs, team) + ' started the challenge at ' + name,
   });
 
-  const players = playerNames(gs, team);
-  return {
-    ok: true,
-    holder:    players[holderIdx],
-    attempter: players[1 - holderIdx],
-  };
+  return { ok: true };
+}
+
+// ── TEAM CLAIMING ─────────────────────────────────────────────────
+// The admin sets teams up (Settings → Game Setup); each player phone
+// then claims one team. A claim ties the team to this device's auth
+// uid, so later phones are only offered the teams still free.
+export async function claimTeam(team) {
+  const uid = await getUid();
+  let failReason = '';
+
+  const committed = await mutateState(gs => {
+    if (!gs.teamClaims) gs.teamClaims = {};
+    const current = gs.teamClaims[team];
+    if (current && current !== uid) {
+      failReason = 'That team was just taken by another phone.';
+      return;
+    }
+    gs.teamClaims[team] = uid;
+    return gs;
+  });
+
+  if (!committed) return { ok: false, reason: failReason || 'Could not join — please try again.' };
+
+  const gs = gameState.data;
+  pushLog({
+    timestamp: Date.now(),
+    team,
+    type: 'timer',
+    message: '📱 A phone connected as ' + teamName(gs, team) +
+      ' (' + playerNames(gs, team).join(' & ') + ')',
+  });
+  return { ok: true };
+}
+
+// A phone can release its own team; an admin can release any team's
+// (e.g. a dead phone). RTDB deletes keys set to null.
+export async function releaseTeam(team) {
+  const uid = await getUid();
+  let failReason = '';
+
+  const committed = await mutateState(gs => {
+    if (!gs.teamClaims || !gs.teamClaims[team]) return;
+    if (gs.teamClaims[team] !== uid && !isAdminMode()) {
+      failReason = 'Another phone holds this team.';
+      return;
+    }
+    gs.teamClaims[team] = null;
+    return gs;
+  });
+
+  return { ok: committed, reason: failReason };
 }
 
 // Admin: free an abandoned attempt — the area reopens to everyone

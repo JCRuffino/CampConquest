@@ -329,40 +329,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
 .settings-card-title { font-weight: 700; font-size: 15px; margin-bottom: 3px; color: #111; }
 .settings-card-desc { font-size: 12px; color: #9ca3af; margin-bottom: 14px; line-height: 1.5; }
 
-.team-assign-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-.team-assign-btn {
-  flex: 1;
-  padding: 9px 4px;
-  border: 2px solid #e5e7eb;
-  border-radius: 10px;
-  background: white;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.15s;
-  color: #374151;
-}
-.team-assign-btn:hover:not(:disabled) { border-color: #9ca3af; background: #f9fafb; }
-.team-assign-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.team-assign-btn.active-a { background: #e63946; color: white; border-color: #e63946; }
-.team-assign-btn.active-b { background: #1d6fd1; color: white; border-color: #1d6fd1; }
-.team-assign-btn.active-c { background: #2a9d3f; color: white; border-color: #2a9d3f; }
-
-.current-team-label { font-size: 12px; color: #6b7280; text-align: center; padding: 4px 0; }
-
-.team-name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.team-name-row label { width: 55px; font-size: 13px; font-weight: 700; flex-shrink: 0; color: #374151; }
-.team-name-row input {
-  flex: 1;
-  padding: 8px 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 13px;
-  outline: none;
-  transition: border-color 0.15s;
-  font-family: inherit;
-}
-.team-name-row input:focus { border-color: #1d6fd1; box-shadow: 0 0 0 3px rgba(29,111,209,0.1); }
+.current-team-label { font-size: 13px; color: #6b7280; text-align: center; padding: 4px 0; font-weight: 600; }
 
 /* ── MODALS ─────────────────────────────────────────────────── */
 .modal-overlay {

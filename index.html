@@ -68,13 +68,9 @@
 
       <div class="settings-card">
         <div class="settings-card-title">👤 Your Team</div>
-        <div class="settings-card-desc">Choose a team!</div>
-        <div class="team-assign-buttons">
-          <button class="team-assign-btn" data-team="1">Join Team A</button>
-          <button class="team-assign-btn" data-team="2">Join Team B</button>
-          <button class="team-assign-btn" data-team="3">Join Team C</button>
-        </div>
         <div id="current-team-label" class="current-team-label">No team assigned</div>
+        <button id="team-pick-btn" class="btn btn-primary btn-full" style="display:none;margin-top:8px;">👥 Choose your team</button>
+        <button id="team-leave-btn" class="btn btn-ghost btn-sm" style="display:none;margin-top:8px;">Leave team</button>
       </div>
 
       <div class="settings-card">
@@ -91,24 +87,59 @@
         </div>
       </div>
 
-      <div class="settings-card">
-        <div class="settings-card-title">✏️ Team Names</div>
-        <div class="settings-card-desc">Rename teams (max 12 characters).</div>
-        <div class="team-name-row">
-          <label>Team A</label>
-          <input type="text" id="name-input-1" maxlength="12" placeholder="Team A" />
-          <button class="btn btn-primary btn-sm btn-save-name" data-team="1">Apply</button>
+      <div class="settings-card" id="setup-card" style="display:none;">
+        <div class="settings-card-title">🎲 Game Setup (Admin)</div>
+        <div class="settings-card-desc">
+          Set the team size, team names and players, then Save. Each player phone that
+          connects picks who they are from the teams not yet taken. Reset the game
+          between groups, and start the timer when everyone's ready.
         </div>
-        <div class="team-name-row">
-          <label>Team B</label>
-          <input type="text" id="name-input-2" maxlength="12" placeholder="Team B" />
-          <button class="btn btn-primary btn-sm btn-save-name" data-team="2">Apply</button>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+          <span style="font-size:13px;font-weight:600;color:#374151;">Players per team:</span>
+          <button class="btn btn-ghost btn-sm team-size-btn" data-size="2">2</button>
+          <button class="btn btn-ghost btn-sm team-size-btn" data-size="3">3</button>
         </div>
-        <div class="team-name-row">
-          <label>Team C</label>
-          <input type="text" id="name-input-3" maxlength="12" placeholder="Team C" />
-          <button class="btn btn-primary btn-sm btn-save-name" data-team="3">Apply</button>
+        <div class="setup-team-block" data-team="1" style="margin-bottom:12px;">
+          <input type="text" id="setup-teamname-1" maxlength="12" placeholder="Team A name"
+            style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;outline:none;font-weight:700;margin-bottom:6px;box-sizing:border-box;" />
+          <div style="display:flex;gap:6px;">
+            <input type="text" id="setup-player-1-1" maxlength="15" placeholder="Player 1"
+              style="flex:1;min-width:0;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;outline:none;" />
+            <input type="text" id="setup-player-1-2" maxlength="15" placeholder="Player 2"
+              style="flex:1;min-width:0;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;outline:none;" />
+            <input type="text" id="setup-player-1-3" maxlength="15" placeholder="Player 3"
+              style="flex:1;min-width:0;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;outline:none;display:none;" />
+          </div>
+          <div id="setup-claim-1" style="font-size:12px;color:#6b7280;margin-top:4px;"></div>
         </div>
+        <div class="setup-team-block" data-team="2" style="margin-bottom:12px;">
+          <input type="text" id="setup-teamname-2" maxlength="12" placeholder="Team B name"
+            style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;outline:none;font-weight:700;margin-bottom:6px;box-sizing:border-box;" />
+          <div style="display:flex;gap:6px;">
+            <input type="text" id="setup-player-2-1" maxlength="15" placeholder="Player 1"
+              style="flex:1;min-width:0;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;outline:none;" />
+            <input type="text" id="setup-player-2-2" maxlength="15" placeholder="Player 2"
+              style="flex:1;min-width:0;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;outline:none;" />
+            <input type="text" id="setup-player-2-3" maxlength="15" placeholder="Player 3"
+              style="flex:1;min-width:0;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;outline:none;display:none;" />
+          </div>
+          <div id="setup-claim-2" style="font-size:12px;color:#6b7280;margin-top:4px;"></div>
+        </div>
+        <div class="setup-team-block" data-team="3" style="margin-bottom:12px;">
+          <input type="text" id="setup-teamname-3" maxlength="12" placeholder="Team C name"
+            style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;outline:none;font-weight:700;margin-bottom:6px;box-sizing:border-box;" />
+          <div style="display:flex;gap:6px;">
+            <input type="text" id="setup-player-3-1" maxlength="15" placeholder="Player 1"
+              style="flex:1;min-width:0;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;outline:none;" />
+            <input type="text" id="setup-player-3-2" maxlength="15" placeholder="Player 2"
+              style="flex:1;min-width:0;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;outline:none;" />
+            <input type="text" id="setup-player-3-3" maxlength="15" placeholder="Player 3"
+              style="flex:1;min-width:0;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;outline:none;display:none;" />
+          </div>
+          <div id="setup-claim-3" style="font-size:12px;color:#6b7280;margin-top:4px;"></div>
+        </div>
+        <button id="setup-save-btn" class="btn btn-primary btn-full">💾 Save Setup</button>
+        <div id="setup-save-status" style="font-size:12px;color:#2a9d3f;font-weight:600;margin-top:6px;display:none;">✅ Saved</div>
       </div>
 
       <div class="settings-card">
@@ -126,10 +157,10 @@
           <button id="timer-endnow-btn" class="btn btn-amber btn-sm">End now</button>
           <button id="timer-cancel-btn" class="btn btn-danger btn-sm">Cancel</button>
         </div>
-        <div style="font-size:11px;color:#9ca3af;margin-top:8px;">Only an admin (no team assigned) can adjust or cancel a running countdown.</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:8px;">Only an admin can start, adjust or cancel the countdown.</div>
       </div>
 
-      <div class="settings-card">
+      <div class="settings-card" id="admin-card">
         <div class="settings-card-title">🛠️ Admin</div>
         <div id="admin-status" class="settings-card-desc" style="margin-bottom:10px;">
           Enter the admin password to unlock admin controls.
@@ -206,7 +237,6 @@
           <button class="accordion-btn">▶️ Starting a Challenge</button>
           <div class="accordion-body">
             <p>Area challenges are only revealed when you start that challenge attempt. You are immediately in the challenge as you read it.</p>
-            <p>All challenges are completed by one team member only, which alternates each challenge. Before a challenge starts the game will remind you which team member should be holding the phone and reading the challenge; the other team member is completing the challenge.</p>
             <p>Some challenges will be on a timer. They might count down and you only have a certain amount of time to do the challenge, or time is recording and the faster you do the challenge the better. The type of challenge is only revealed when you start the challenge.</p>
             <p>The live timer shows in the area's popup on everyone's phone.</p>
             <p>Remember to only press Start when your team is actually at the area and ready to go.</p>

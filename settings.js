@@ -1,116 +1,195 @@
-import { mutateState, pushLog } from './firebase.js';
+import { mutateState, pushLog, getUid } from './firebase.js';
 import { gameState, getMyTeam, setMyTeam, states, teamName, esc,
-         getGameCode, setGameCode, normalizeGameCode,
+         getGameCode, setGameCode, normalizeGameCode, playerNames, teamSize,
          isAdminMode, setAdminMode } from './shared.js';
+import { claimTeam, releaseTeam } from './actions.js';
 import { toggleAreaEditor } from './map.js';
-import { showModal, showConfirm } from './modal.js';
+import { showModal, showConfirm, showInfo } from './modal.js';
 
 export function initSettings(resetCallback) {
 
-  // ── Team assignment ───────────────────────────────────────────────
-  const assignBtns   = document.querySelectorAll('.team-assign-btn');
+  // ── Your team ─────────────────────────────────────────────────────
+  // The admin enters the rosters (Game Setup below); each player phone
+  // claims one team from those still free. Being on a team means
+  // holding its claim (gameState.teamClaims[team] === this device's
+  // auth uid) — if the claim goes (admin release, reset), the phone
+  // drops off the team and is offered the pick again.
   const currentLabel = document.getElementById('current-team-label');
-  const activeClasses = { 1: 'active-a', 2: 'active-b', 3: 'active-c' };
+  const pickBtn      = document.getElementById('team-pick-btn');
+  const leaveBtn     = document.getElementById('team-leave-btn');
 
-  function refreshAssignUI() {
+  let myUid = null;
+  getUid().then(uid => { myUid = uid; refreshTeamUI(); });
+
+  function availableTeams() {
+    const gs = gameState.data;
+    if (!gs) return [];
+    const claims = gs.teamClaims || {};
+    return [1, 2, 3].filter(t => {
+      const roster = ((gs.players && gs.players[t]) || []).filter(n => n);
+      return roster.length > 0 && !claims[t];
+    });
+  }
+
+  let pickerOpen     = false;
+  let pickerDeclined = false; // "just watching" — don't re-prompt this session
+
+  async function offerTeamPick(auto) {
+    if (pickerOpen) return;
+    const avail = availableTeams();
+    if (!avail.length) return;
+    pickerOpen = true;
+    try {
+      const gs  = gameState.data;
+      const res = await showModal({
+        title: '👥 Which team is this phone for?',
+        bodyHTML: 'Each team has one phone. Pick your set of players — teams already on a phone aren\'t shown.',
+        buttons: [
+          ...avail.map(t => ({
+            id:    't' + t,
+            label: esc(playerNames(gs, t).join(' & ')) + ' — ' + esc(teamName(gs, t)),
+            color: states[t].color,
+          })),
+          { id: 'watch', label: 'Not playing / just watching', style: 'ghost' },
+        ],
+        dismissable: true,
+      });
+      if (!res || res.button === 'watch') {
+        if (auto) pickerDeclined = true;
+        return;
+      }
+      const t = parseInt(res.button.slice(1));
+      const r = await claimTeam(t);
+      if (!r.ok) {
+        await showInfo('😬 Too slow', esc(r.reason || 'That team was just taken.'));
+        pickerOpen = false;
+        return offerTeamPick(auto); // re-offer with the updated list
+      }
+      setMyTeam(t);
+      rerender();
+    } finally {
+      pickerOpen = false;
+    }
+  }
+
+  function refreshTeamUI() {
     const myTeam = getMyTeam();
     const gs     = gameState.data;
-    const names  = (gs && gs.teamNames) || {};
-    assignBtns.forEach(btn => {
-      const t    = parseInt(btn.dataset.team);
-      const name = names[t] || states[t].label;
-      btn.classList.remove('active-a', 'active-b', 'active-c');
-      if (myTeam === t) {
-        btn.textContent = 'Leave ' + name;
-        btn.classList.add(activeClasses[t]);
-      } else {
-        btn.textContent = 'Join ' + name;
-      }
-      // No direct switching — you must leave your team before joining another
-      btn.disabled = myTeam !== null && myTeam !== t;
-    });
     if (myTeam) {
-      const name = (gameState.data && gameState.data.teamNames && gameState.data.teamNames[myTeam])
-        || states[myTeam].label;
-      currentLabel.textContent = '✅ You are on ' + name;
+      currentLabel.textContent = '✅ You are on ' + teamName(gs, myTeam) +
+        ' — ' + playerNames(gs, myTeam).join(' & ');
       currentLabel.style.color = states[myTeam].color;
     } else {
-      currentLabel.textContent = 'No team assigned — spectator/admin mode';
+      currentLabel.textContent = availableTeams().length
+        ? 'No team assigned yet.'
+        : 'No team assigned — spectator/admin mode.';
       currentLabel.style.color = '#555';
     }
-    refreshResetBtn();
+    if (pickBtn)  pickBtn.style.display  = (!myTeam && availableTeams().length) ? 'block' : 'none';
+    if (leaveBtn) leaveBtn.style.display = myTeam ? 'inline-flex' : 'none';
     refreshAdminUI();
   }
 
-  // If the name write races the initial Firebase load (the transaction
-  // no-ops on empty state), stash it and flush once state arrives
-  let pendingPlayerNames = null;
+  if (pickBtn) pickBtn.addEventListener('click', () => {
+    pickerDeclined = false;
+    offerTeamPick(false);
+  });
 
-  async function savePlayerNames(t, names) {
-    const committed = await mutateState(gs => {
-      if (!gs.players) gs.players = {};
-      gs.players[t] = names;
-      return gs;
-    });
-    if (!committed) pendingPlayerNames = { t, names };
-  }
+  if (leaveBtn) leaveBtn.addEventListener('click', async () => {
+    const myTeam = getMyTeam();
+    if (!myTeam) return;
+    const ok = await showConfirm('Leave ' + esc(teamName(gameState.data, myTeam)) + '?',
+      'This frees the team for another phone to claim.', 'Leave team');
+    if (!ok) return;
+    await releaseTeam(myTeam);
+    setMyTeam(null);
+    pickerDeclined = false;
+    rerender();
+  });
 
   function rerender() {
-    refreshAssignUI();
+    refreshTeamUI();
     if (gameState.data) {
       import('./ui.js').then(({ renderAll }) => renderAll(gameState.data));
     }
   }
 
-  assignBtns.forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const t      = parseInt(btn.dataset.team);
-      const myTeam = getMyTeam();
-      if (myTeam === t) {
-        setMyTeam(null);
-        rerender();
-        return;
-      }
-      if (myTeam !== null) return;
+  // ── Game setup (admin) ────────────────────────────────────────────
+  const setupCard    = document.getElementById('setup-card');
+  const setupSaveBtn = document.getElementById('setup-save-btn');
+  const setupStatus  = document.getElementById('setup-save-status');
 
-      // Challenges alternate between the two players, so the app
-      // needs both names when a team is joined
-      const existing = (gameState.data && gameState.data.players && gameState.data.players[t]) || [];
-      const res = await showModal({
-        title: 'Join ' + esc(teamName(gameState.data, t)),
-        bodyHTML: 'Who\'s on this team? The app alternates phone duty between you.',
-        fields: [
-          { id: 'n1', label: 'First team member',  value: existing[0] || '', maxlength: 15 },
-          { id: 'n2', label: 'Second team member', value: existing[1] || '', maxlength: 15 },
-        ],
-        buttons: [
-          { id: 'join',   label: 'Join team', style: 'primary' },
-          { id: 'cancel', label: 'Cancel',    style: 'ghost' },
-        ],
-        dismissable: true,
-      });
-      if (!res || res.button !== 'join') return;
-      const names = [res.values.n1 || 'Player 1', res.values.n2 || 'Player 2'];
-      setMyTeam(t);
-      savePlayerNames(t, names);
-      rerender();
+  let setupSizeChoice = null; // unsaved local selection; falls back to gs.teamSize
+
+  function selectedSize() {
+    return setupSizeChoice || teamSize(gameState.data);
+  }
+
+  function refreshSetupUI() {
+    const size = selectedSize();
+    document.querySelectorAll('.team-size-btn').forEach(b => {
+      const active = parseInt(b.dataset.size) === size;
+      b.classList.toggle('btn-primary', active);
+      b.classList.toggle('btn-ghost', !active);
+    });
+    [1, 2, 3].forEach(t => {
+      const third = document.getElementById('setup-player-' + t + '-3');
+      if (third) third.style.display = size === 3 ? '' : 'none';
+    });
+    const claims = (gameState.data && gameState.data.teamClaims) || {};
+    [1, 2, 3].forEach(t => {
+      const el = document.getElementById('setup-claim-' + t);
+      if (!el) return;
+      el.innerHTML = claims[t]
+        ? '📱 Phone connected · <button class="btn btn-ghost btn-sm setup-release-btn" data-team="' + t + '">Release</button>'
+        : '📵 No phone connected yet';
+    });
+  }
+
+  document.querySelectorAll('.team-size-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      setupSizeChoice = parseInt(b.dataset.size);
+      refreshSetupUI();
     });
   });
 
-  // ── Team names ────────────────────────────────────────────────────
-  [1, 2, 3].forEach(t => {
-    const input   = document.getElementById('name-input-' + t);
-    const saveBtn = document.querySelector('.btn-save-name[data-team="' + t + '"]');
+  // Release buttons are re-rendered with the claim status — delegate
+  if (setupCard) setupCard.addEventListener('click', async e => {
+    const btn = e.target.closest('.setup-release-btn');
+    if (!btn || !isAdminMode()) return;
+    const t  = parseInt(btn.dataset.team);
+    const ok = await showConfirm('Release ' + esc(teamName(gameState.data, t)) + '\'s phone?',
+      'That phone drops off the team and the team becomes claimable again.', 'Release');
+    if (ok) releaseTeam(t);
+  });
 
-    saveBtn.addEventListener('click', () => {
-      const val = input.value.trim().slice(0, 12);
-      if (!val) return;
-      mutateState(gs => {
-        if (!gs.teamNames) gs.teamNames = {};
-        gs.teamNames[t] = val;
-        return gs;
+  if (setupSaveBtn) setupSaveBtn.addEventListener('click', async () => {
+    if (!isAdminMode()) return;
+    const size = selectedSize();
+    const committed = await mutateState(gs => {
+      gs.teamSize = size;
+      if (!gs.teamNames) gs.teamNames = {};
+      if (!gs.players)   gs.players   = {};
+      [1, 2, 3].forEach(t => {
+        const nameEl = document.getElementById('setup-teamname-' + t);
+        const nm = nameEl ? nameEl.value.trim().slice(0, 12) : '';
+        if (nm) gs.teamNames[t] = nm;
+        const roster = [];
+        for (let i = 1; i <= size; i++) {
+          const el = document.getElementById('setup-player-' + t + '-' + i);
+          const v  = el ? el.value.trim().slice(0, 15) : '';
+          if (v) roster.push(v);
+        }
+        gs.players[t] = roster;
       });
+      return gs;
     });
+    if (setupStatus) {
+      setupStatus.textContent = committed ? '✅ Saved' : '❌ Not saved — still connecting? Try again.';
+      setupStatus.style.color = committed ? '#2a9d3f' : '#e63946';
+      setupStatus.style.display = 'block';
+      setTimeout(() => { setupStatus.style.display = 'none'; }, 4000);
+    }
   });
 
   // ── Game timer ────────────────────────────────────────────────────
@@ -138,7 +217,7 @@ export function initSettings(resetCallback) {
       timerAdjustRow.style.display = isAdmin ? 'flex' : 'none';
     } else {
       timerStatus.textContent = 'No countdown set.';
-      timerStartRow.style.display  = 'flex';
+      timerStartRow.style.display  = isAdmin ? 'flex' : 'none';
       timerAdjustRow.style.display = 'none';
     }
   }
@@ -256,11 +335,16 @@ export function initSettings(resetCallback) {
     }
     if (adminRow)    adminRow.style.display   = on ? 'none' : 'flex';
     if (adminBtn)    adminBtn.textContent     = on ? '🔒 Lock' : 'Unlock';
+    if (setupCard)     setupCard.style.display     = on ? 'block' : 'none';
     if (editorCard)    editorCard.style.display    = on ? 'block' : 'none';
     if (resetCard)     resetCard.style.display     = on ? 'block' : 'none';
     if (broadcastCard) broadcastCard.style.display = on ? 'block' : 'none';
+    // Player phones (on a team, not admin) see no admin unlock at all
+    const adminCard = document.getElementById('admin-card');
+    if (adminCard) adminCard.style.display = (getMyTeam() && !on) ? 'none' : 'block';
     const lockBtn = document.getElementById('admin-lock-btn');
     if (lockBtn) lockBtn.style.display = on ? 'inline-flex' : 'none';
+    if (on) refreshSetupUI();
     refreshTimerUI();
   }
 
@@ -331,15 +415,12 @@ export function initSettings(resetCallback) {
   // ── Reset (admin) ─────────────────────────────────────────────────
   const resetBtn = document.getElementById('reset-btn');
 
-  function refreshResetBtn() {
-    // visibility handled by refreshAdminUI via the card
-  }
-
   resetBtn.addEventListener('click', async () => {
     if (!isAdminMode()) return;
     const ok = await showConfirm('⚠️ Reset the ENTIRE game?',
-      'Every area goes back to unclaimed and the history is wiped ' +
-      '(team names and player rosters are kept).<br><br><strong>This cannot be undone.</strong>',
+      'Every area goes back to unclaimed and the history is wiped. ' +
+      'The game setup (team size, names and rosters) is kept, but player ' +
+      'phones drop off their teams and pick again.<br><br><strong>This cannot be undone.</strong>',
       'Yes, reset', 'Cancel', 'danger');
     if (!ok) return;
     resetCallback();
@@ -347,22 +428,40 @@ export function initSettings(resetCallback) {
 
   // ── Public API ────────────────────────────────────────────────────
   function refresh() {
-    const gs    = gameState.data;
-    if (pendingPlayerNames && gs) {
-      const p = pendingPlayerNames;
-      pendingPlayerNames = null;
-      savePlayerNames(p.t, p.names);
+    const gs     = gameState.data;
+    const myTeam = getMyTeam();
+
+    // Being on a team requires holding its claim — if it's gone
+    // (admin release, reset, or another phone took it), drop off
+    if (gs && myTeam && myUid) {
+      const claims = gs.teamClaims || {};
+      if (claims[myTeam] !== myUid) setMyTeam(null);
     }
-    const names = (gs && gs.teamNames) || {};
+
+    // Keep the admin setup inputs in sync with the saved state
+    const names   = (gs && gs.teamNames) || {};
+    const players = (gs && gs.players)   || {};
     [1, 2, 3].forEach(t => {
-      const input = document.getElementById('name-input-' + t);
-      if (input && !input.matches(':focus')) {
-        input.value = names[t] || states[t].label;
+      const nameInput = document.getElementById('setup-teamname-' + t);
+      if (nameInput && !nameInput.matches(':focus')) {
+        nameInput.value = names[t] || states[t].label;
+      }
+      const roster = players[t] || [];
+      for (let i = 1; i <= 3; i++) {
+        const el = document.getElementById('setup-player-' + t + '-' + i);
+        if (el && !el.matches(':focus')) el.value = roster[i - 1] || '';
       }
     });
-    refreshAssignUI();
+
+    refreshTeamUI();
+
+    // A phone with no team gets offered the free teams (once per
+    // session, unless it asks again via the Choose button)
+    if (gs && !getMyTeam() && !isAdminMode() && !pickerDeclined) {
+      offerTeamPick(true);
+    }
   }
 
-  refreshAssignUI();
+  refreshTeamUI();
   return { refresh };
 }

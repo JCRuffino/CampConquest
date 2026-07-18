@@ -44,6 +44,13 @@ function getDeviceId() {
   return auth.currentUser.uid;
 }
 
+// The same UID, safe to call before auth has finished — used to tie
+// a team claim (gameState.teamClaims) to this device
+export async function getUid() {
+  await authReady;
+  return getDeviceId();
+}
+
 // ── GAME STATE WRITE ──────────────────────────────────────────────
 // Full overwrite — only for creating/resetting the game
 export async function pushState(gs) {
