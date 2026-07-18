@@ -36,6 +36,7 @@ export function initSettings(resetCallback) {
 
   async function offerTeamPick(auto) {
     if (pickerOpen) return;
+    if (isAdminMode()) return; // the admin teaches, they don't play
     const avail = availableTeams();
     if (!avail.length) return;
     pickerOpen = true;
@@ -85,7 +86,7 @@ export function initSettings(resetCallback) {
         : 'No team assigned — spectator/admin mode.';
       currentLabel.style.color = '#555';
     }
-    if (pickBtn)  pickBtn.style.display  = (!myTeam && availableTeams().length) ? 'block' : 'none';
+    if (pickBtn)  pickBtn.style.display  = (!myTeam && !isAdminMode() && availableTeams().length) ? 'block' : 'none';
     if (leaveBtn) leaveBtn.style.display = myTeam ? 'inline-flex' : 'none';
     refreshAdminUI();
   }
@@ -351,9 +352,16 @@ export function initSettings(resetCallback) {
   if (adminBtn) adminBtn.addEventListener('click', () => {
     if (adminInput.value === ADMIN_PASSWORD) {
       setAdminMode(true);
+      // The admin runs the game, they don't play — free any team this
+      // phone was holding so a player phone can claim it
+      const myTeam = getMyTeam();
+      if (myTeam) {
+        releaseTeam(myTeam);
+        setMyTeam(null);
+      }
       adminInput.value = '';
       adminError.style.display = 'none';
-      refreshAdminUI();
+      refreshTeamUI();
       if (gameState.data) {
         import('./ui.js').then(({ renderAll }) => renderAll(gameState.data));
       }
