@@ -511,9 +511,8 @@ export function initSettings(resetCallback) {
         if (isAdminMode() || availableTeams().length) {
           kickNote = true; // the picker (below) explains it
         } else {
-          showInfo('📱 Off the team',
-            'This phone is no longer on a team — the game was reset or the admin freed it.<br>' +
-            'When the next game is set up you\'ll be asked to pick again.');
+          showInfo('👋 Thanks for playing',
+            'Thanks for playing, you have now been disconnected from the game, please close this window.');
         }
       }
     }
