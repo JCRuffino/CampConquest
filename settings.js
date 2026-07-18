@@ -160,7 +160,7 @@ export function initSettings(resetCallback) {
     const myTeam = getMyTeam();
     if (!myTeam) return;
     const ok = await showConfirm('Leave ' + esc(teamName(gameState.data, myTeam)) + '?',
-      'This frees the team for another phone to claim.', 'Leave team');
+      'This frees the team so another phone can join as them.', 'Leave team');
     if (!ok) return;
     await releaseTeam(myTeam);
     setMyTeam(null);
@@ -233,7 +233,7 @@ export function initSettings(resetCallback) {
     if (!btn || !isAdminMode()) return;
     const t  = parseInt(btn.dataset.team);
     const ok = await showConfirm('Release ' + esc(teamName(gameState.data, t)) + '\'s phone?',
-      'That phone drops off the team and the team becomes claimable again.', 'Release');
+      'That phone drops off the team and another phone can join as them.', 'Release');
     if (ok) releaseTeam(t);
   });
 
