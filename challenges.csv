@@ -1,22 +1,22 @@
-Area	Challenge	Pass Mark	Timer
-Main Campfire	PLAYTEST: Roll a D20 until you roll a 17. Record how many rolls it took (fewer is better).	Fewer than 20 rolls
-Chapel	PLAYTEST: Cumulatively roll a total higher than 95 on a D20 before the timer runs out. Record your final total (higher is better).	Higher than 95	countdown 5
-SD Glade	PLAYTEST: Roll a D20 until you roll a 20. The clock is running — record your time (faster is better).	Under 4:00	countup
-Village Square	PLAYTEST: Cumulatively roll a total higher than 121 on a D20 before the timer runs out. Record your final total (higher is better).	Higher than 121	countdown 5
-Arena	PLAYTEST: Roll a D20 until you roll a 14. Record how many rolls it took (fewer is better).	Fewer than 10 rolls
-Shops	PLAYTEST: Cumulatively roll a total higher than 88 on a D20 before the timer runs out. Record your final total (higher is better).	Higher than 88	countdown 5
-Beeches	PLAYTEST: Roll a D20 until you roll a 19. The clock is running — record your time (faster is better).	Under 3:30	countup
-RPG Glade	PLAYTEST: Roll a D20 until you roll an 11. Record how many rolls it took (fewer is better).	Fewer than 6 rolls
-Meadow	PLAYTEST: Cumulatively roll a total higher than 132 on a D20 before the timer runs out. Record your final total (higher is better).	Higher than 132	countdown 10
-Willows 1	PLAYTEST: Roll a D20 until you roll an 18. The clock is running — record your time (faster is better).	Under 3:00	countup
-Willows 4	PLAYTEST: Cumulatively roll a total higher than 104 on a D20 before the timer runs out. Record your final total (higher is better).	Higher than 104	countdown 5
-Willows 5	PLAYTEST: Roll a D20 until you roll a 13. Record how many rolls it took (fewer is better).	Fewer than 8 rolls
-Willows 2	PLAYTEST: Roll a D20 until you roll a 16. The clock is running — record your time (faster is better).	Under 2:30	countup
-Birches 1	PLAYTEST: Cumulatively roll a total higher than 150 on a D20 before the timer runs out. Record your final total (higher is better).	Higher than 150	countdown 10
-Birches 2	PLAYTEST: Roll a D20 until you roll a 15. Record how many rolls it took (fewer is better).	Fewer than 12 rolls
-Birches 3	PLAYTEST: Roll a D20 until you roll a 17. The clock is running — record your time (faster is better).	Under 2:00	countup
-Oaks 1	PLAYTEST: Cumulatively roll a total higher than 99 on a D20 before the timer runs out. Record your final total (higher is better).	Higher than 99	countdown 5
-Oaks 2	PLAYTEST: Roll a D20 until you roll a 12. Record how many rolls it took (fewer is better).	Fewer than 7 rolls
-Oaks 3	PLAYTEST: Cumulatively roll a total higher than 117 on a D20 before the timer runs out. Record your final total (higher is better).	Higher than 117	countdown 5
-Oaks 4	PLAYTEST: Roll a D20 until you roll a 20. The clock is running — record your time (faster is better).	Under 5:00	countup
-Chestnut	PLAYTEST: Cumulatively roll a total higher than 140 on a D20 before the timer runs out. Record your final total (higher is better).	Higher than 140	countdown 10
+Area	Challenge	Pass Mark	Timer	Info	Answer
+Main Campfire	Read the Scout Promise aloud to one teammate (tap "Show extra info" — only the reader may look!). They must tell it to the other teammate, who must repeat it back to the reader. No one may look up the promise or write it down. It must come back accurately or the challenge is failed. Fastest wins.	Promise repeated back accurately	countup	The Scout Promise:<br><br>I promise that I will do my best<br>to uphold our Scout values, to do my duty to The King,<br>to help other people<br>and to keep the Cub Scout Law.
+Chapel	Two teammates stand facing away from each other in complete silence, counting 75 seconds in their heads — the clock started the moment you pressed Start. The next thing either of them may say is "Time" when they believe 75 seconds have passed. When the first person says it, hit the finish button — the elapsed time is your result. Land within 5 seconds of 1:15 to pass; the time closest to 1:15 wins a steal.	Between 1:10 and 1:20	countup
+SD Glade	Teammates A and B must invent a secret handshake with at least 10 steps. B then teaches it to C, who must not have seen or heard it being created. A and C must then perform the handshake with no mistakes. Fastest wins.	A and C perform it perfectly	countup
+Village Square	Find Joe. Fastest wins.	Joe found	countup
+Arena	Make an A4-sized target. Standing five metres away, throw stones (each over 2cm across) at it — every stone that lands on the target scores one point. You have 5 minutes. Most points wins.	At least 1 point	countdown 5
+Shops	Guess the distance from the edge of the arena stage to the till of the scout shop, in metres — you can include the centimetres, e.g. "38.25". No measuring! Closest guess wins.	Any guess claims it			41.82
+Beeches	Find five different types of leaves from trees or bushes. Fastest wins.	All five leaves found	countup
+RPG Glade	Act out the 5 animals hidden under "Show extra info" — only the actor may look! No sounds or talking allowed except confirming a correct guess, and your team must say the EXACT name of each animal. Any talking or unauthorised communication is a fail. Fastest wins.	All 5 guessed, no talking	countup	Act these out, in order:<br><br>1. Elephant<br>2. Butterfly<br>3. Vulture<br>4. Spider<br>5. Chimpanzee
+Meadow	Standing at least 10 metres apart, one teammate signals random letters in semaphore; the other must call each letter correctly. Attempt as many letters as you like, but every attempted letter must be read correctly. Most letters wins.	At least 1 letter
+Willows 1	Find five insects (they must be insects). Fastest wins.	All five insects found	countup
+Willows 4	Find a spiderweb. Fastest wins.	Web found	countup
+Willows 5	Find three sticks that are exactly the same length. You cannot break sticks off trees or snap them to change their length. Fastest wins.	Three matching sticks	countup
+Willows 2	What year did the Scout Association originally purchase the land for Bushy Wood Activity Centre? No research allowed — closest guess wins.	Any guess claims it			1938
+Birches 1	Balance 5 objects (each smaller than a 500ml water bottle) on top of each other. The stack must stand unsupported for 10 seconds. Fastest wins.	Stack stands for 10 seconds	countup
+Birches 2	Find the height of your shortest teammate in sticks. Fastest wins.	Height measured in sticks	countup
+Birches 3	All teammates must hold a full plank at the same time. The moment the first person stops, hit the finish button — the elapsed time is your result. LONGEST time wins.	Everyone holds a plank	countup
+Oaks 1	Find an image of an extinct animal. It cannot be on a screen or electronic device, and not on anything owned by any player. Fastest wins.	Image found	countup
+Oaks 2	One teammate makes pictures of animals on the ground from natural objects; another teammate must correctly name each animal attempted. Most animals wins.	At least 1 animal named
+Oaks 3	Choose a teammate: they go away where they can't see or hear you (they may research while away). The rest create a scout tracking sign. The solo teammate returns and has ONE guess at what it means — a wrong guess is a fail. Fastest wins.	Sign guessed on the first try	countup
+Oaks 4	Balance a natural object (stone, stick, pinecone…) on top of your head. The clock started when you pressed Start — hit the finish button the moment it falls off. LONGEST time wins.	Balance it at all	countup
+Chestnut	How big is the Bushy Wood site in acres? No research allowed — closest guess wins.	Any guess claims it			17

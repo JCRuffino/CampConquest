@@ -17,7 +17,7 @@ Built with vanilla JavaScript (ES modules), [Leaflet](https://leafletjs.com/) + 
 - `firebase.js` — Firebase setup, transactional state updates, game log
 - `shared.js` — game state helpers, win detection, and constants shared across modules
 - `areas.js` — the 20 festival zones as named polygons plus the connections between them (which drive the largest-connected-group score); zones are expanded so neighbours visibly touch
-- `challenges.csv` — per zone (tab-separated): Area, Challenge, Pass Mark, Timer (`countdown N` minutes, `countup`, or empty); results should be measurable so steals can "beat" them
+- `challenges.csv` — per zone (tab-separated): Area, Challenge, Pass Mark, Timer (`countdown N` minutes, `countup`, or empty), Info (optional second-screen text revealed by a button — keeps e.g. the animals to act hidden from guessers; `<br>` allowed), Answer (optional numeric answer for closest-wins guesses — the app validates guesses as numbers and judges steals itself without revealing the answer); results should be measurable so steals can "beat" them
 
 ## Setting up the real campsite
 

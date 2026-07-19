@@ -292,12 +292,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const lines  = challengesCsv.trim().split('\n');
       lines.shift();
       lines.forEach(line => {
-        const [name, challenge, passMark, timer] = line.split('\t');
+        // Info: optional second-screen text (revealed via a button, so
+        // e.g. the animals to act stay hidden from the guessers; <br>
+        // allowed). Answer: optional numeric answer for closest-wins
+        // guess challenges — the app judges steals automatically.
+        const [name, challenge, passMark, timer, info, answer] = line.split('\t');
         if (!name) return;
+        const ans = parseFloat(answer);
         byName[name.trim()] = {
           challenge: (challenge || '').trim(),
           passMark:  (passMark || '').trim(),
           timer:     parseTimer(timer),
+          info:      (info || '').trim(),
+          answer:    isNaN(ans) ? null : ans,
         };
       });
 
@@ -310,6 +317,8 @@ document.addEventListener('DOMContentLoaded', () => {
           challenge: ch ? ch.challenge : '',
           passMark:  ch ? ch.passMark : '',
           timer:     ch ? ch.timer : null,
+          info:      ch ? ch.info : '',
+          answer:    ch ? ch.answer : null,
         });
       });
       console.log('🏕️ Areas loaded:', allAreas.length);

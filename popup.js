@@ -88,6 +88,13 @@ export function openAreaPopup(area, latlng) {
         '<div style="font-size:12px;color:#374151;margin-top:4px;line-height:1.5;">' +
           esc(area.challenge || 'No challenge set') + '</div>' +
       '</div>';
+    // Second-screen info (e.g. the animals to act, the Scout Promise)
+    // stays behind a button so only the player who should read it does
+    if (area.info) {
+      body +=
+        '<button id="info-btn" class="btn btn-neutral btn-sm btn-full" style="margin-top:8px;">' +
+          '📄 Show extra info</button>';
+    }
     // A stealing team is NOT shown the pass mark or the score to beat —
     // they attempt blind and only learn the owner's result after
     // committing their own
@@ -237,6 +244,37 @@ export function openAreaPopup(area, latlng) {
     reopen();
   });
 
+  const infoBtn = content.querySelector('#info-btn');
+  if (infoBtn) infoBtn.addEventListener('click', () => {
+    showModal({
+      title: '📄 Extra info',
+      bodyHTML: area.info,
+      buttons: [{ id: 'ok', label: 'Close', style: 'primary' }],
+      dismissable: true,
+    });
+  });
+
+  // Guess challenges carry a numeric answer in challenges.csv: results
+  // must be numbers, and steals are judged by the app (closest wins)
+  // without ever revealing the answer to the players
+  const isGuess = area.answer != null;
+
+  async function promptResult(bodyText, prefill) {
+    while (true) {
+      const result = await showPrompt('🏅 Your result',
+        isGuess ? 'Enter your guess as a number, e.g. "41.82".' : bodyText,
+        { label: isGuess ? 'Your guess' : 'Result', value: prefill, maxlength: 60 });
+      if (result === null) return null;
+      if (!result) { prefill = ''; showError('You must record a result.'); continue; }
+      if (isGuess && isNaN(parseFloat(result))) {
+        prefill = result;
+        showError('Your guess must be a number, e.g. "41.82".');
+        continue;
+      }
+      return result;
+    }
+  }
+
   const claimBtn = content.querySelector('#claim-btn');
   if (claimBtn) claimBtn.addEventListener('click', async () => {
     // For count-up challenges the elapsed time IS the natural result
@@ -250,16 +288,16 @@ export function openAreaPopup(area, latlng) {
       if (isUnclaimed) {
         const ok = await showConfirm(
           '⛺ Claim ' + esc(area.name) + '?',
-          'Only press this if your team genuinely reached the pass mark' +
-          (passMark ? ' (<strong>' + esc(passMark) + '</strong>)' : '') + '!',
+          isGuess
+            ? 'Lock in your team\'s guess — it becomes the score rivals must beat.'
+            : 'Only press this if your team genuinely reached the pass mark' +
+              (passMark ? ' (<strong>' + esc(passMark) + '</strong>)' : '') + '!',
           '⛺ We passed!', 'Back'
         );
         if (!ok) return;
-        const result = await showPrompt('🏅 Your result',
-          'e.g. "14 catches", "3:38" — this is what others must beat.',
-          { label: 'Result', value: suggested, maxlength: 60 });
+        const result = await promptResult(
+          'e.g. "14 catches", "3:38" — this is what others must beat.', suggested);
         if (result === null) return;
-        if (!result) { showError('You must record a result.'); return; }
         const res = await claimArea(key, myTeam, expected, result);
         if (!res.ok) { showError(res.reason); return; }
         setWakeLock(false);
@@ -271,11 +309,42 @@ export function openAreaPopup(area, latlng) {
       // revealed and the comparison settles the duel either way
       let prefill = suggested;
       while (true) {
-        const result = await showPrompt('🏅 Your result',
-          'Be honest — you\'ll find out what you were up against next…',
-          { label: 'Result', value: prefill, maxlength: 60 });
+        const result = await promptResult(
+          'Be honest — you\'ll find out what you were up against next…', prefill);
         if (result === null) return; // abort — the attempt stays in progress
-        if (!result) { prefill = ''; continue; }
+
+        // Closest-wins guesses: the app compares both guesses to the
+        // stored answer and settles the duel itself — no going back
+        // after the owner's guess is revealed
+        const ownerVal = parseFloat(a.result);
+        if (isGuess && !isNaN(ownerVal)) {
+          const mineOff  = Math.abs(parseFloat(result) - area.answer);
+          const ownerOff = Math.abs(ownerVal - area.answer);
+          const win      = mineOff < ownerOff; // tie → the owner keeps it
+          const verdict = await showModal({
+            title: '🥁 The moment of truth',
+            bodyHTML:
+              esc(teamName(gs, a.owner)) + '\'s guess: <strong>' + esc(a.result) + '</strong><br>' +
+              'Your guess: <strong>' + esc(result) + '</strong>' +
+              '<div style="text-align:center;font-size:16px;font-weight:800;margin:10px 0;">' +
+                (win
+                  ? '🎉 Your guess is closer — you steal the area!'
+                  : '🛡️ ' + esc(teamName(gs, a.owner)) + '\'s guess is closer (or equal) — it locks for them.') +
+              '</div>',
+            buttons: [win
+              ? { id: 'go', label: '😈 Steal &amp; lock!', color: states[myTeam].color }
+              : { id: 'go', label: '🔒 Lock it for ' + esc(teamName(gs, a.owner)), style: 'neutral' }],
+            dismissable: false,
+          });
+          void verdict;
+          const res = win
+            ? await claimArea(key, myTeam, expected, result)
+            : await failChallenge(key, myTeam, expected);
+          if (!res.ok) { showError(res.reason); return; }
+          setWakeLock(false);
+          getMap().closePopup();
+          return;
+        }
 
         const verdict = await showModal({
           title: '🥁 The moment of truth',
