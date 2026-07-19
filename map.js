@@ -4,7 +4,7 @@
 // editor in editor.js.
 
 import { pushPlayerLocation, removePlayerLocation, listenToPlayerLocations } from './firebase.js';
-import { states, gameState, toKey, getMyTeam, esc, teamName } from './shared.js';
+import { states, gameState, toKey, getMyTeam, esc, teamName, pointInPolygon } from './shared.js';
 import { openAreaPopup, popupSync } from './popup.js';
 import { isEditorActive, selectEditorZone } from './editor.js';
 import { siteBoundary } from './areas.js';
@@ -92,6 +92,27 @@ export function getAreaLayers() {
 }
 
 // ── AREA POLYGONS ─────────────────────────────────────────────────
+// Visual centre of a zone: the area-weighted centroid (shoelace), not
+// the bounding-box centre, which drifts badly for irregular shapes.
+// Falls back to the bounds centre if a concave shape puts the
+// centroid outside the polygon.
+function polygonCentre(coords, leafletPolygon) {
+  let a = 0, cx = 0, cy = 0;
+  for (let i = 0, j = coords.length - 1; i < coords.length; j = i++) {
+    const [y1, x1] = coords[j];
+    const [y2, x2] = coords[i];
+    const f = x1 * y2 - x2 * y1;
+    a  += f;
+    cx += (x1 + x2) * f;
+    cy += (y1 + y2) * f;
+  }
+  if (a) {
+    const lat = cy / (3 * a), lng = cx / (3 * a);
+    if (pointInPolygon(lat, lng, coords)) return L.latLng(lat, lng);
+  }
+  return leafletPolygon.getBounds().getCenter();
+}
+
 export function addAreas(areas) {
   // Ground that belongs to no zone (gaps between unlinked zones, the
   // southern woodland) renders as light grey hatching: the site polygon
@@ -107,6 +128,7 @@ export function addAreas(areas) {
     const key = toKey(area.name);
 
     const polygon = L.polygon(area.polygon, styleFor(0, false)).addTo(map);
+    const centre  = polygonCentre(area.polygon, polygon);
 
     // Permanent name label at the polygon's centre
     const label = L.tooltip({
@@ -115,7 +137,7 @@ export function addAreas(areas) {
       className:   'area-label',
       interactive: false,
     })
-      .setLatLng(polygon.getBounds().getCenter())
+      .setLatLng(centre)
       .setContent(labelHTML(area.name, false))
       .addTo(map);
 
@@ -127,7 +149,7 @@ export function addAreas(areas) {
       openAreaPopup(area, e.latlng);
     });
 
-    areaLayers[key] = { area, polygon, label };
+    areaLayers[key] = { area, polygon, label, centre };
   });
 
   // Frame the whole site on first load
@@ -218,7 +240,7 @@ function updateAttemptBadge(key, layer, a) {
     iconAnchor: [13, 40], // floats above the zone name
   });
 
-  const badge = L.marker(layer.polygon.getBounds().getCenter(), {
+  const badge = L.marker(layer.centre, {
     icon, zIndexOffset: 1500, interactive: false,
   }).addTo(map);
   badge._sig = sig;
