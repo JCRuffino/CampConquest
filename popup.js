@@ -259,12 +259,53 @@ export function openAreaPopup(area, latlng) {
   // without ever revealing the answer to the players
   const isGuess = area.answer != null;
 
+  // Steal results are entered via showPrompt (a single field, no risk
+  // of a stray Enter submitting the wrong button); claims use
+  // promptClaim below, which folds the "only claim if you passed"
+  // reminder into the same modal as the result field.
   async function promptResult(bodyText, prefill) {
     while (true) {
       const result = await showPrompt('🏅 Your result',
         isGuess ? 'Enter your guess as a number, e.g. "41.82".' : bodyText,
         { label: isGuess ? 'Your guess' : 'Result', value: prefill, maxlength: 60 });
       if (result === null) return null;
+      if (!result) { prefill = ''; showError('You must record a result.'); continue; }
+      if (isGuess && isNaN(parseFloat(result))) {
+        prefill = result;
+        showError('Your guess must be a number, e.g. "41.82".');
+        continue;
+      }
+      return result;
+    }
+  }
+
+  // Claiming an unclaimed area: one modal carries both the "only claim
+  // if you passed" reminder and the result field, instead of a confirm
+  // followed by a separate prompt
+  async function promptClaim(prefill) {
+    const reminderHTML = isGuess
+      ? 'Lock in your team\'s guess — it becomes the score rivals must beat.'
+      : 'Only claim if your team genuinely reached the pass mark' +
+        (passMark ? ' (<strong>' + esc(passMark) + '</strong>)' : '') + '!';
+    while (true) {
+      const res = await showModal({
+        title: '⛺ Claim ' + esc(area.name),
+        bodyHTML: reminderHTML,
+        fields: [{
+          id: 'result',
+          label: isGuess ? 'Your guess' : 'Result',
+          value: prefill,
+          placeholder: isGuess ? 'e.g. "41.82"' : 'e.g. "14 catches", "3:38"',
+          maxlength: 60,
+        }],
+        buttons: [
+          { id: 'claim', label: '⛺ We passed — Claim!', color: states[myTeam].color },
+          { id: 'back',  label: 'Back', style: 'ghost' },
+        ],
+        dismissable: true,
+      });
+      if (!res || res.button === 'back') return null;
+      const result = (res.values.result || '').trim();
       if (!result) { prefill = ''; showError('You must record a result.'); continue; }
       if (isGuess && isNaN(parseFloat(result))) {
         prefill = result;
@@ -286,17 +327,7 @@ export function openAreaPopup(area, latlng) {
     busy = true;
     try {
       if (isUnclaimed) {
-        const ok = await showConfirm(
-          '⛺ Claim ' + esc(area.name) + '?',
-          isGuess
-            ? 'Lock in your team\'s guess — it becomes the score rivals must beat.'
-            : 'Only press this if your team genuinely reached the pass mark' +
-              (passMark ? ' (<strong>' + esc(passMark) + '</strong>)' : '') + '!',
-          '⛺ We passed!', 'Back'
-        );
-        if (!ok) return;
-        const result = await promptResult(
-          'e.g. "14 catches", "3:38" — this is what others must beat.', suggested);
+        const result = await promptClaim(suggested);
         if (result === null) return;
         const res = await claimArea(key, myTeam, expected, result);
         if (!res.ok) { showError(res.reason); return; }
