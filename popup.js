@@ -495,7 +495,14 @@ export function openAreaPopup(area, latlng) {
     });
   }
 
-  L.popup({ maxWidth: 280 })
+  // Keep the popup (and its own attempt timer) clear of the fixed
+  // top bar (game timer pill + sync status) and the bottom nav, so
+  // Leaflet's auto-pan never tucks it behind either
+  L.popup({
+    maxWidth: 280,
+    autoPanPaddingTopLeft:     L.point(10, 60),
+    autoPanPaddingBottomRight: L.point(10, 70),
+  })
     .setLatLng(latlng)
     .setContent(content)
     .openOn(map);
