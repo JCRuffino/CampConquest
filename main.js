@@ -296,15 +296,21 @@ document.addEventListener('DOMContentLoaded', () => {
         // e.g. the animals to act stay hidden from the guessers; <br>
         // allowed). Answer: optional numeric answer for closest-wins
         // guess challenges — the app judges steals automatically.
-        const [name, challenge, passMark, timer, info, answer] = line.split('\t');
+        // Challenge (2p) / Pass Mark (2p): optional overrides used only
+        // when the game is set to 2 players per team (some challenges
+        // need a genuinely different version, not just a reworded one,
+        // e.g. a 3-person relay/teach chain has no middle link with 2).
+        const [name, challenge, passMark, timer, info, answer, challenge2p, passMark2p] = line.split('\t');
         if (!name) return;
         const ans = parseFloat(answer);
         byName[name.trim()] = {
-          challenge: (challenge || '').trim(),
-          passMark:  (passMark || '').trim(),
-          timer:     parseTimer(timer),
-          info:      (info || '').trim(),
-          answer:    isNaN(ans) ? null : ans,
+          challenge:   (challenge || '').trim(),
+          passMark:    (passMark || '').trim(),
+          timer:       parseTimer(timer),
+          info:        (info || '').trim(),
+          answer:      isNaN(ans) ? null : ans,
+          challenge2p: (challenge2p || '').trim(),
+          passMark2p:  (passMark2p || '').trim(),
         };
       });
 
@@ -312,13 +318,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const ch = byName[def.name];
         if (!ch) console.warn('⚠️ No challenge found in challenges.csv for area:', def.name);
         allAreas.push({
-          name:      def.name,
-          polygon:   def.polygon,
-          challenge: ch ? ch.challenge : '',
-          passMark:  ch ? ch.passMark : '',
-          timer:     ch ? ch.timer : null,
-          info:      ch ? ch.info : '',
-          answer:    ch ? ch.answer : null,
+          name:        def.name,
+          polygon:     def.polygon,
+          challenge:   ch ? ch.challenge : '',
+          passMark:    ch ? ch.passMark : '',
+          timer:       ch ? ch.timer : null,
+          info:        ch ? ch.info : '',
+          answer:      ch ? ch.answer : null,
+          challenge2p: ch ? ch.challenge2p : '',
+          passMark2p:  ch ? ch.passMark2p : '',
         });
       });
       console.log('🏕️ Areas loaded:', allAreas.length);

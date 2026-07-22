@@ -3,7 +3,7 @@
 // blind steal verdicts, and the admin's per-area controls. The open
 // popup re-renders itself when the area's state changes remotely.
 
-import { states, gameState, toKey, getMyTeam, esc, teamName,
+import { states, gameState, toKey, getMyTeam, esc, teamName, teamSize,
          hasStarted, getCurrentAttempt, isAdminMode, formatCountdown } from './shared.js';
 import { claimArea, failChallenge, startAttempt, adminSetArea, adminClearAttempt } from './actions.js';
 import { showModal, showConfirm, showPrompt } from './modal.js';
@@ -68,8 +68,14 @@ export function openAreaPopup(area, latlng) {
   // Challenge text is revealed only once a team STARTS an attempt (or
   // if you're the owner — you passed it — or a password admin)
   const revealed    = admin || isMine || hasStarted(gs, myTeam, key);
+  // Some challenges need a genuinely different version for 2-player
+  // teams (not just reworded) — challenges.csv carries an optional
+  // override, used only when the game is currently set to 2 per team
+  const is2p          = teamSize(gs) === 2;
+  const challengeText = (is2p && area.challenge2p) ? area.challenge2p : area.challenge;
   // The admin can override the CSV pass mark mid-game
-  const passMark    = a.passMark || area.passMark;
+  const basePassMark = (is2p && area.passMark2p) ? area.passMark2p : area.passMark;
+  const passMark     = a.passMark || basePassMark;
 
   const statusText = a.locked
     ? '🔒 Locked by ' + esc(teamName(gs, a.owner)) + ' — cannot be taken'
@@ -86,7 +92,7 @@ export function openAreaPopup(area, latlng) {
         '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;' +
           'font-weight:700;color:white;background:#f4a300;">⚡ Challenge</span>' +
         '<div style="font-size:12px;color:#374151;margin-top:4px;line-height:1.5;">' +
-          esc(area.challenge || 'No challenge set') + '</div>' +
+          esc(challengeText || 'No challenge set') + '</div>' +
       '</div>';
     // Second-screen info (e.g. the animals to act, the Scout Promise)
     // stays behind a button so only the player who should read it does
