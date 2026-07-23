@@ -94,10 +94,9 @@
           connects picks who they are from the teams not yet taken. Reset the game
           between groups, and start the timer when everyone's ready.
         </div>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
-          <span style="font-size:13px;font-weight:600;color:#374151;">Players per team:</span>
-          <button class="btn btn-ghost btn-sm team-size-btn" data-size="2">2</button>
-          <button class="btn btn-ghost btn-sm team-size-btn" data-size="3">3</button>
+        <div style="font-size:12px;color:#6b7280;margin-bottom:12px;">
+          <strong>Players per team: <span id="setup-size-label">—</span></strong> — this is only
+          changed as part of a Full Reset, so it can't shift under a game in progress.
         </div>
         <div class="setup-team-block" data-team="1" style="margin-bottom:12px;">
           <input type="text" id="setup-teamname-1" maxlength="12" placeholder="Team A name"
@@ -209,7 +208,8 @@
           <strong>Restart Game</strong> wipes the board and history but keeps the teams and
           their connected phones — for redoing a game with the same players.
           <strong>Full Reset</strong> also wipes team names, rosters and disconnects every
-          phone — use it between groups so the system is ready for new players.
+          phone — use it between groups so the system is ready for new players. It's also the
+          only place you choose 2 or 3 players per team, for the group about to start.
         </div>
         <button id="restart-btn" class="btn btn-amber btn-full" style="margin-bottom:8px;">🔄 Restart Game (same teams)</button>
         <button id="reset-btn" class="btn btn-danger btn-full">🧹 Full Reset (new group)</button>

@@ -55,24 +55,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })();
 
-  const settings = initSettings((mode) => {
+  const settings = initSettings((mode, size) => {
     // Two flavours of reset. 'restart': same game night, same people —
     // wipe the board/history but keep the whole setup AND the
-    // phone-to-team claims, so nobody has to re-pick. 'full': next
-    // group — wipe teams, rosters and claims too (connected phones
-    // drop off their teams); only the team-size choice carries over.
+    // phone-to-team claims, so nobody has to re-pick; players-per-team
+    // is unchanged. 'full': next group — wipe teams, rosters and claims
+    // too (connected phones drop off their teams); players-per-team is
+    // chosen fresh for this group (settings.js prompts for it as part
+    // of Full Reset — that's the ONLY place it can change).
     const prev  = gameState.data || {};
     const fresh = defaultState(allAreas);
-    if (prev.teamSize) fresh.teamSize = prev.teamSize;
     if (mode === 'restart') {
-      if (prev.teamNames)  fresh.teamNames  = prev.teamNames;
-      if (prev.players)    fresh.players    = prev.players;
-      if (prev.teamClaims) fresh.teamClaims = prev.teamClaims;
+      if (prev.teamSize)    fresh.teamSize    = prev.teamSize;
+      if (prev.teamNames)   fresh.teamNames   = prev.teamNames;
+      if (prev.players)     fresh.players     = prev.players;
+      if (prev.teamClaims)  fresh.teamClaims  = prev.teamClaims;
       // Same group carries on — the epoch used to tell "a full reset
       // happened since I joined" apart from "my team was just
       // released mid-game" must NOT move on a mere restart
       fresh.resetEpoch = prev.resetEpoch || 0;
     } else {
+      fresh.teamSize = size === 3 ? 3 : 2;
       // A new group is starting — bump the epoch so every phone that
       // held a team is recognised as a brand-new player next time it
       // reconnects, however it left (see settings.js syncTeamFromClaims)

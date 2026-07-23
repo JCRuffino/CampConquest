@@ -228,12 +228,6 @@ export function initSettings(resetCallback) {
   const setupSaveBtn = document.getElementById('setup-save-btn');
   const setupStatus  = document.getElementById('setup-save-status');
 
-  let setupSizeChoice = null; // unsaved local selection; falls back to gs.teamSize
-
-  function selectedSize() {
-    return setupSizeChoice || teamSize(gameState.data);
-  }
-
   // Fields being edited are "dirty" until saved — refresh() must not
   // clobber them when remote state changes (phones claiming/leaving
   // teams write state while the admin is mid-typing)
@@ -247,13 +241,11 @@ export function initSettings(resetCallback) {
     });
   }
 
+  const setupSizeLabel = document.getElementById('setup-size-label');
+
   function refreshSetupUI() {
-    const size = selectedSize();
-    document.querySelectorAll('.team-size-btn').forEach(b => {
-      const active = parseInt(b.dataset.size) === size;
-      b.classList.toggle('btn-primary', active);
-      b.classList.toggle('btn-ghost', !active);
-    });
+    const size = teamSize(gameState.data);
+    if (setupSizeLabel) setupSizeLabel.textContent = String(size);
     [1, 2, 3].forEach(t => {
       const third = document.getElementById('setup-player-' + t + '-3');
       if (third) third.style.display = size === 3 ? '' : 'none';
@@ -268,13 +260,6 @@ export function initSettings(resetCallback) {
     });
   }
 
-  document.querySelectorAll('.team-size-btn').forEach(b => {
-    b.addEventListener('click', () => {
-      setupSizeChoice = parseInt(b.dataset.size);
-      refreshSetupUI();
-    });
-  });
-
   // Release buttons are re-rendered with the claim status — delegate
   if (setupCard) setupCard.addEventListener('click', async e => {
     const btn = e.target.closest('.setup-release-btn');
@@ -287,9 +272,10 @@ export function initSettings(resetCallback) {
 
   if (setupSaveBtn) setupSaveBtn.addEventListener('click', async () => {
     if (!isAdminMode()) return;
-    const size = selectedSize();
+    // Players-per-team is fixed for the whole game and only changed via
+    // Full Reset — Save here only touches names and rosters at that size
+    const size = teamSize(gameState.data);
     const committed = await mutateState(gs => {
-      gs.teamSize = size;
       if (!gs.teamNames) gs.teamNames = {};
       if (!gs.players)   gs.players   = {};
       [1, 2, 3].forEach(t => {
@@ -587,14 +573,24 @@ export function initSettings(resetCallback) {
 
   resetBtn.addEventListener('click', async () => {
     if (!isAdminMode()) return;
-    const ok = await showConfirm('⚠️ FULL reset for a new group?',
-      'Everything is wiped: the board, the history, team names, rosters — ' +
-      'and every phone is disconnected from its team. ' +
-      'Enter the new group in Game Setup afterwards.' +
-      '<br><br><strong>This cannot be undone.</strong>',
-      'Yes, full reset', 'Cancel', 'danger');
-    if (!ok) return;
-    resetCallback('full');
+    // Players-per-team is chosen HERE, for the incoming group, and
+    // nowhere else — this is the only moment it can change
+    const res = await showModal({
+      title: '⚠️ Full reset for a new group',
+      bodyHTML:
+        'Everything is wiped: the board, the history, team names, rosters — ' +
+        'and every phone is disconnected from its team.<br><br>' +
+        'How many players per team for this new group?' +
+        '<br><br><strong>This cannot be undone.</strong>',
+      buttons: [
+        { id: 'size2',  label: '2 players per team → Full Reset', style: 'danger' },
+        { id: 'size3',  label: '3 players per team → Full Reset', style: 'danger' },
+        { id: 'cancel', label: 'Cancel', style: 'ghost' },
+      ],
+      dismissable: true,
+    });
+    if (!res || res.button === 'cancel') return;
+    resetCallback('full', res.button === 'size3' ? 3 : 2);
   });
 
   // ── Public API ────────────────────────────────────────────────────
