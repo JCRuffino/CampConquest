@@ -68,6 +68,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (prev.teamNames)  fresh.teamNames  = prev.teamNames;
       if (prev.players)    fresh.players    = prev.players;
       if (prev.teamClaims) fresh.teamClaims = prev.teamClaims;
+      // Same group carries on — the epoch used to tell "a full reset
+      // happened since I joined" apart from "my team was just
+      // released mid-game" must NOT move on a mere restart
+      fresh.resetEpoch = prev.resetEpoch || 0;
+    } else {
+      // A new group is starting — bump the epoch so every phone that
+      // held a team is recognised as a brand-new player next time it
+      // reconnects, however it left (see settings.js syncTeamFromClaims)
+      fresh.resetEpoch = (prev.resetEpoch || 0) + 1;
     }
     pushState(fresh);
     clearLog();

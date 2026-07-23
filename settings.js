@@ -1,6 +1,7 @@
 import { mutateState, pushLog, getUid } from './firebase.js';
 import { gameState, getMyTeam, setMyTeam, states, teamName, esc,
          getGameCode, setGameCode, normalizeGameCode, playerNames, teamSize,
+         resetEpoch, getMyTeamEpoch, setMyTeamEpoch,
          isAdminMode, setAdminMode } from './shared.js';
 import { claimTeam, releaseTeam } from './actions.js';
 import { toggleAreaEditor } from './map.js';
@@ -19,7 +20,15 @@ export function initSettings(resetCallback) {
   const leaveBtn     = document.getElementById('team-leave-btn');
 
   let myUid = null;
-  getUid().then(uid => { myUid = uid; refreshTeamUI(); });
+  getUid().then(uid => {
+    myUid = uid;
+    // gameState may already have arrived before auth resolved (or vice
+    // versa) — re-check from whichever side finishes second, so the
+    // claim-validity check below never gets silently skipped
+    syncTeamFromClaims();
+    refreshTeamUI();
+    maybeOnboard();
+  });
 
   function availableTeams() {
     const gs = gameState.data;
@@ -33,7 +42,45 @@ export function initSettings(resetCallback) {
 
   let pickerOpen     = false;
   let pickerDeclined = false; // "just watching" — don't re-prompt this session
-  let kickNote       = false; // this phone was just dropped off its team
+  let kickNote       = false; // lightweight re-pick (no rules) vs full onboarding
+
+  // Being on a team requires holding its claim — if it's gone (admin
+  // release, a full reset, or another phone somehow took it), drop off.
+  // A FULL reset bumps gs.resetEpoch; if that's moved on since this
+  // phone last claimed a team, treat it as a brand-new player (full
+  // onboarding, rules and all) — otherwise it's a same-game phone
+  // swap (e.g. a dead phone), so skip straight to a lightweight re-pick.
+  function syncTeamFromClaims() {
+    const gs     = gameState.data;
+    const myTeam = getMyTeam();
+    if (!gs || !myTeam || !myUid) return;
+    const claims = gs.teamClaims || {};
+    if (claims[myTeam] === myUid) return; // still valid, nothing to do
+
+    const wasFullReset = resetEpoch(gs) > getMyTeamEpoch();
+    setMyTeam(null);
+    pickerDeclined = false;
+    if (isAdminMode() || availableTeams().length) {
+      kickNote = !wasFullReset;
+    } else {
+      showInfo('👋 Thanks for playing',
+        'Thanks for playing, you have now been disconnected from the game, please close this window.');
+      kickNote = false;
+    }
+  }
+
+  // A phone with no team is onboarded (playing? → rules → picker); a
+  // phone released mid-game without an intervening full reset re-picks
+  // without the rules. Called after every gameState update AND once
+  // this device's auth uid resolves, so neither trigger can race past
+  // the other and leave a stale claim undetected (see getUid() above).
+  function maybeOnboard() {
+    const gs = gameState.data;
+    if (gs && !getMyTeam() && !isAdminMode() && !pickerDeclined) {
+      if (kickNote) offerTeamPick(true);
+      else startOnboarding();
+    }
+  }
 
   async function offerTeamPick(auto) {
     if (pickerOpen) return;
@@ -45,7 +92,7 @@ export function initSettings(resetCallback) {
     try {
       const gs  = gameState.data;
       const note = kickNote
-        ? '<strong>This phone was disconnected from its team (game reset or admin release).</strong><br><br>'
+        ? '<strong>The admin released this phone from its team — pick again.</strong><br><br>'
         : '';
       kickNote = false;
       const res = await showModal({
@@ -73,6 +120,7 @@ export function initSettings(resetCallback) {
         return offerTeamPick(auto); // re-offer with the updated list
       }
       setMyTeam(t);
+      setMyTeamEpoch(resetEpoch(gameState.data)); // mark: valid as of this reset epoch
       rerender();
     } finally {
       pickerOpen = false;
@@ -551,26 +599,8 @@ export function initSettings(resetCallback) {
 
   // ── Public API ────────────────────────────────────────────────────
   function refresh() {
-    const gs     = gameState.data;
-    const myTeam = getMyTeam();
-
-    // Being on a team requires holding its claim — if it's gone
-    // (admin release, reset, or another phone took it), drop off and
-    // tell the player why (via the picker if teams are free, or a
-    // one-off notice after a full reset when there's nothing to pick)
-    if (gs && myTeam && myUid) {
-      const claims = gs.teamClaims || {};
-      if (claims[myTeam] !== myUid) {
-        setMyTeam(null);
-        pickerDeclined = false;
-        if (isAdminMode() || availableTeams().length) {
-          kickNote = true; // the picker (below) explains it
-        } else {
-          showInfo('👋 Thanks for playing',
-            'Thanks for playing, you have now been disconnected from the game, please close this window.');
-        }
-      }
-    }
+    const gs = gameState.data;
+    syncTeamFromClaims();
 
     // Keep the admin setup inputs in sync with the saved state — but
     // never overwrite a field being edited (focused or unsaved-dirty)
@@ -588,13 +618,7 @@ export function initSettings(resetCallback) {
     });
 
     refreshTeamUI();
-
-    // A phone with no team is onboarded (playing? → rules → picker);
-    // a phone that was released mid-game re-picks without the rules
-    if (gs && !getMyTeam() && !isAdminMode() && !pickerDeclined) {
-      if (kickNote) offerTeamPick(true);
-      else startOnboarding();
-    }
+    maybeOnboard();
   }
 
   refreshTeamUI();
