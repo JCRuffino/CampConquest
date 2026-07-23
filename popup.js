@@ -167,7 +167,8 @@ export function openAreaPopup(area, latlng) {
       states[myTeam].color + ';">▶️ Start Challenge Attempt</button>' +
       '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center;">' +
         'Only press this when your team is <strong>at this area</strong> and ready — ' +
-        'it reveals the challenge, starts any timer, and commits you to a pass or a fail.' +
+        'it reveals the challenge and starts any timer. ' +
+        '<strong>This can\'t be undone once you start.</strong>' +
         (isUnclaimed ? '' : ' Stealing shuts the other team out — win or lose, this area locks.') +
       '</div>';
   } else {
