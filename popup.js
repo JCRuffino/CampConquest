@@ -166,7 +166,8 @@ export function openAreaPopup(area, latlng) {
       '<button id="start-btn" class="btn btn-full" style="margin-top:10px;background:' +
       states[myTeam].color + ';">▶️ Start Challenge Attempt</button>' +
       '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center;">' +
-        'Starting reveals the challenge and commits your team to a pass or a fail.' +
+        'Only press this when your team is <strong>at this area</strong> and ready — ' +
+        'it reveals the challenge, starts any timer, and commits you to a pass or a fail.' +
         (isUnclaimed ? '' : ' Stealing shuts the other team out — win or lose, this area locks.') +
       '</div>';
   } else {
@@ -231,16 +232,11 @@ export function openAreaPopup(area, latlng) {
 
   const startBtn = content.querySelector('#start-btn');
   if (startBtn) startBtn.addEventListener('click', async () => {
+    // No confirmation step — the button's own caption is the warning.
+    // Tapping it commits immediately, so the challenge and any timer
+    // appear together with a single tap, not after a second screen.
     busy = true;
     try {
-      const ok = await showConfirm(
-        '▶️ Start the challenge at ' + esc(area.name) + '?',
-        'Only start when your team is <strong>at this area</strong> and ready.<br><br>' +
-        'The challenge is revealed, any timer starts immediately, and your team must then record either a pass or a fail.' +
-        (isUnclaimed ? '' : '<br><br><strong>Stealing shuts the other team out — win or lose, this area locks.</strong>'),
-        '▶️ Start!', 'Not yet'
-      );
-      if (!ok) return;
       const res = await startAttempt(key, myTeam, expected);
       if (!res.ok) { showError(res.reason); return; }
       setWakeLock(true);
