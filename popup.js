@@ -261,21 +261,35 @@ export function openAreaPopup(area, latlng) {
   // must be numbers, and steals are judged by the app (closest wins)
   // without ever revealing the answer to the players
   const isGuess = area.answer != null;
+  // Example shown in guess prompts/placeholders. This MUST NOT equal any
+  // value in challenges.csv's Answer column, or it hands that zone's
+  // answer to every team — enforced by tests/content.test.js.
+  const GUESS_EXAMPLE = '12.5';
+
+  // A validation error from the PREVIOUS attempt, shown inside the next
+  // modal's own body — showError() writes to the popup's #popup-error,
+  // which is no help once the modal overlay is covering it
+  function errorBlockHTML(msg) {
+    return msg
+      ? '<div style="color:#e63946;font-weight:700;margin-bottom:8px;">⚠️ ' + esc(msg) + '</div>'
+      : '';
+  }
 
   // Steal results are entered via showPrompt (a single field, no risk
   // of a stray Enter submitting the wrong button); claims use
   // promptClaim below, which folds the "only claim if you passed"
   // reminder into the same modal as the result field.
   async function promptResult(bodyText, prefill) {
+    let error = '';
     while (true) {
       const result = await showPrompt('🏅 Your result',
-        isGuess ? 'Enter your guess as a number, e.g. "41.82".' : bodyText,
+        errorBlockHTML(error) + (isGuess ? 'Enter your guess as a number, e.g. "' + GUESS_EXAMPLE + '".' : bodyText),
         { label: isGuess ? 'Your guess' : 'Result', value: prefill, maxlength: 60 });
       if (result === null) return null;
-      if (!result) { prefill = ''; showError('You must record a result.'); continue; }
+      if (!result) { prefill = ''; error = 'You must record a result.'; continue; }
       if (isGuess && isNaN(parseFloat(result))) {
         prefill = result;
-        showError('Your guess must be a number, e.g. "41.82".');
+        error = 'Your guess must be a number, e.g. "' + GUESS_EXAMPLE + '".';
         continue;
       }
       return result;
@@ -290,15 +304,16 @@ export function openAreaPopup(area, latlng) {
       ? 'Lock in your team\'s guess — it becomes the score rivals must beat.'
       : 'Only claim if your team genuinely reached the pass mark' +
         (passMark ? ' (<strong>' + esc(passMark) + '</strong>)' : '') + '!';
+    let error = '';
     while (true) {
       const res = await showModal({
         title: '⛺ Claim ' + esc(area.name),
-        bodyHTML: reminderHTML,
+        bodyHTML: errorBlockHTML(error) + reminderHTML,
         fields: [{
           id: 'result',
           label: isGuess ? 'Your guess' : 'Result',
           value: prefill,
-          placeholder: isGuess ? 'e.g. "41.82"' : 'e.g. "14 catches", "3:38"',
+          placeholder: isGuess ? 'e.g. "' + GUESS_EXAMPLE + '"' : 'e.g. "14 catches", "3:38"',
           maxlength: 60,
         }],
         buttons: [
@@ -309,10 +324,10 @@ export function openAreaPopup(area, latlng) {
       });
       if (!res || res.button === 'back') return null;
       const result = (res.values.result || '').trim();
-      if (!result) { prefill = ''; showError('You must record a result.'); continue; }
+      if (!result) { prefill = ''; error = 'You must record a result.'; continue; }
       if (isGuess && isNaN(parseFloat(result))) {
         prefill = result;
-        showError('Your guess must be a number, e.g. "41.82".');
+        error = 'Your guess must be a number, e.g. "' + GUESS_EXAMPLE + '".';
         continue;
       }
       return result;

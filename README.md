@@ -16,12 +16,12 @@ Built with vanilla JavaScript (ES modules), [Leaflet](https://leafletjs.com/) + 
 - `settings.js` — admin game setup (team size, team names, player rosters), the phone-to-team picker, game code, game timer, admin unlock (password in this file), area editor toggle, game reset
 - `firebase.js` — Firebase setup, transactional state updates, game log
 - `shared.js` — game state helpers, win detection, and constants shared across modules
-- `areas.js` — the 20 festival zones as named polygons plus the connections between them (which drive the largest-connected-group score); zones are expanded so neighbours visibly touch
+- `areas.js` — the 21 festival zones as named polygons plus the connections between them (which drive the largest-connected-group score); zones are expanded so neighbours visibly touch
 - `challenges.csv` — per zone (tab-separated): Area, Challenge, Pass Mark, Timer (`countdown N` minutes, `countup`, or empty), Info (optional second-screen text revealed by a button — keeps e.g. the animals to act hidden from guessers; `<br>` allowed), Answer (optional numeric answer for closest-wins guesses — the app validates guesses as numbers and judges steals itself without revealing the answer); results should be measurable so steals can "beat" them
 
 ## Setting up the real campsite
 
-1. **Zones** — the 20 festival zones in `areas.js` were placed by georeferencing the Strange Games Festival site map onto the real site boundary, so placements are close but not exact. To refine one: unlock admin mode in Settings, start the **Area Editor**, tap the zone on the map, drag its corner handles, press Copy Snippet, and paste it over that zone's entry in `areas.js`.
+1. **Zones** — the 21 festival zones in `areas.js` were placed by georeferencing the Strange Games Festival site map onto the real site boundary, so placements are close but not exact. To refine one: unlock admin mode in Settings, start the **Area Editor**, tap the zone on the map, drag its corner handles, press Copy Snippet, and paste it over that zone's entry in `areas.js`.
 2. **Challenges** — edit `challenges.csv` (tab-separated). The `Area` column must exactly match the `name` in `areas.js`.
 3. **Site illustration (optional)** — to use a nicer hand-drawn map instead of raw OSM tiles, drop the image in this folder and set `SITE_IMAGE` at the top of `map.js` with the image URL and the lat/lng bounds it covers.
 

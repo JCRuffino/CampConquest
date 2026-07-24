@@ -43,6 +43,16 @@ export function initSettings(resetCallback) {
   let pickerOpen     = false;
   let pickerDeclined = false; // "just watching" — don't re-prompt this session
   let kickNote       = false; // lightweight re-pick (no rules) vs full onboarding
+  // Handle of the "new game starting" holding note (see below) — kept
+  // so startOnboarding() can dismiss it once real rosters arrive,
+  // instead of stacking a second modal on top of it
+  let holdingNoteHandle = null;
+
+  function anyRosterExists() {
+    const gs = gameState.data;
+    if (!gs) return false;
+    return [1, 2, 3].some(t => ((gs.players && gs.players[t]) || []).filter(n => n).length > 0);
+  }
 
   // Being on a team requires holding its claim — if it's gone (admin
   // release, a full reset, or another phone somehow took it), drop off.
@@ -62,9 +72,18 @@ export function initSettings(resetCallback) {
     pickerDeclined = false;
     if (isAdminMode() || availableTeams().length) {
       kickNote = !wasFullReset;
-    } else {
+    } else if (anyRosterExists()) {
+      // At least one team is set up, just all claimed — a real dead end
       showInfo('👋 Thanks for playing',
         'Thanks for playing, you have now been disconnected from the game, please close this window.');
+      kickNote = false;
+    } else {
+      // No team has a roster at all — this is the moment right after a
+      // Full Reset, before the admin has saved the next group's setup.
+      // Transient: hold here (dismissable) until rosters exist, then
+      // startOnboarding() below closes this and takes over.
+      holdingNoteHandle = showInfo('🔄 New game starting',
+        'The admin is setting up the next game — you\'ll be asked to pick your team when they\'re ready.');
       kickNote = false;
     }
   }
@@ -139,6 +158,12 @@ export function initSettings(resetCallback) {
     if (onboardingActive || pickerOpen) return;
     if (isAdminMode() || getMyTeam()) return;
     if (!availableTeams().length) return;
+    // Rosters have arrived — the holding note (if any) is stale now;
+    // dismiss it so it doesn't sit stacked under this modal
+    if (holdingNoteHandle) {
+      holdingNoteHandle.close();
+      holdingNoteHandle = null;
+    }
     onboardingActive = true;
     const res = await showModal({
       title: '🏕️ Playing in the next game?',
@@ -200,6 +225,14 @@ export function initSettings(resetCallback) {
   }
 
   if (pickBtn) pickBtn.addEventListener('click', () => {
+    // If onboarding is already mid-flight (rules screen open, waiting on
+    // the confirm button), startOnboarding() below would just no-op —
+    // send them back to confirm the rules instead of doing nothing
+    if (onboardingActive) {
+      document.querySelector('.nav-btn[data-screen="rules"]').click();
+      if (rulesDoneBtn) rulesDoneBtn.style.display = 'block';
+      return;
+    }
     pickerDeclined = false;
     startOnboarding(); // playing? → rules → picker
   });
@@ -210,7 +243,11 @@ export function initSettings(resetCallback) {
     const ok = await showConfirm('Leave ' + esc(teamName(gameState.data, myTeam)) + '?',
       'This frees the team so another phone can join as them.', 'Leave team');
     if (!ok) return;
-    await releaseTeam(myTeam);
+    const r = await releaseTeam(myTeam);
+    if (!r.ok) {
+      await showInfo('❌ Could not leave', esc(r.reason || 'Please try again.'));
+      return; // the remote claim never changed — stay on the team locally too
+    }
     setMyTeam(null);
     pickerDeclined = false;
     rerender();
@@ -244,8 +281,13 @@ export function initSettings(resetCallback) {
   const setupSizeLabel = document.getElementById('setup-size-label');
 
   function refreshSetupUI() {
-    const size = teamSize(gameState.data);
-    if (setupSizeLabel) setupSizeLabel.textContent = String(size);
+    // teamSize() (shared.js) treats "unset" the same as 2 — fine for
+    // gameplay, but Setup must tell an untouched game apart from one
+    // deliberately set to 2, so read the raw value here instead
+    const gs      = gameState.data;
+    const rawSize = gs ? gs.teamSize : null;
+    if (setupSizeLabel) setupSizeLabel.textContent = rawSize == null ? '—' : String(rawSize);
+    const size = rawSize == null ? 2 : rawSize; // keep the 3rd input hidden until a size is chosen
     [1, 2, 3].forEach(t => {
       const third = document.getElementById('setup-player-' + t + '-3');
       if (third) third.style.display = size === 3 ? '' : 'none';
@@ -272,10 +314,29 @@ export function initSettings(resetCallback) {
 
   if (setupSaveBtn) setupSaveBtn.addEventListener('click', async () => {
     if (!isAdminMode()) return;
-    // Players-per-team is fixed for the whole game and only changed via
-    // Full Reset — Save here only touches names and rosters at that size
-    const size = teamSize(gameState.data);
+    // Players-per-team is fixed for the whole game and normally only
+    // changed via Full Reset. But a brand-new game code has never been
+    // through a reset (gameState.data.teamSize is null, not 2 or 3), so
+    // there's no size to keep — ask once, here, as part of the very
+    // first save. This is the ONLY other place the size can be set;
+    // once it's non-null, Full Reset remains the only way to change it.
+    let size = gameState.data ? gameState.data.teamSize : null;
+    if (size == null) {
+      const res = await showModal({
+        title: '👥 Players per team',
+        bodyHTML: 'This game has no team size yet — how many players per team?',
+        buttons: [
+          { id: 'size2',  label: '2 players per team', style: 'primary' },
+          { id: 'size3',  label: '3 players per team', style: 'primary' },
+          { id: 'cancel', label: 'Cancel', style: 'ghost' },
+        ],
+        dismissable: true,
+      });
+      if (!res || res.button === 'cancel') return; // abort — no half-written setup
+      size = res.button === 'size3' ? 3 : 2;
+    }
     const committed = await mutateState(gs => {
+      gs.teamSize = size;
       if (!gs.teamNames) gs.teamNames = {};
       if (!gs.players)   gs.players   = {};
       [1, 2, 3].forEach(t => {

@@ -10,10 +10,16 @@ import { esc } from './shared.js';
 //  - fields: [{ id, label, value, placeholder, maxlength, type }]
 //  - buttons: [{ id, label, style ('primary'|'danger'|'ghost'|'amber'|'neutral'|'success'), color }]
 //  - resolves { button, values } — or null if dismissed (dismissable only)
+//  - the returned promise also has a .close() method: force-dismiss the
+//    modal programmatically (resolves null, as if the user dismissed it)
+//    — for the rare case a caller needs to retract a modal it opened
+//    earlier because it's no longer relevant (e.g. superseded by a
+//    newer prompt), so two overlays never end up stacked
 export function showModal({ title, bodyHTML = '', fields = [], buttons, dismissable = false }) {
   buttons = buttons && buttons.length ? buttons : [{ id: 'ok', label: 'OK', style: 'primary' }];
 
-  return new Promise(resolve => {
+  let closeModal;
+  const promise = new Promise(resolve => {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay active';
 
@@ -47,6 +53,7 @@ export function showModal({ title, bodyHTML = '', fields = [], buttons, dismissa
       overlay.remove();
       resolve(result);
     }
+    closeModal = () => finish(null);
 
     function collectValues() {
       const values = {};
@@ -78,6 +85,8 @@ export function showModal({ title, bodyHTML = '', fields = [], buttons, dismissa
     });
     if (inputs.length) setTimeout(() => inputs[0].focus(), 60);
   });
+  promise.close = () => closeModal();
+  return promise;
 }
 
 // Info dialog: one OK button, tap-outside closes. Fire-and-forget safe.

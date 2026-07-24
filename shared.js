@@ -77,15 +77,20 @@ export function teamName(gs, i) {
   return names[i] || states[i].label;
 }
 
-// The players on a team (entered by the admin in Game Setup)
-export function playerNames(gs, team) {
-  const p = ((gs && gs.players && gs.players[team]) || []).filter(n => n);
-  return p.length ? p : ['Player 1', 'Player 2'];
-}
-
 // Players per team — 2 or 3, chosen by the admin in Game Setup
 export function teamSize(gs) {
   return gs && gs.teamSize === 3 ? 3 : 2;
+}
+
+// The players on a team (entered by the admin in Game Setup). Only an
+// EMPTY roster gets the generic fallback — a partially-filled roster is
+// left as-is, not padded — and the fallback itself is sized to the
+// game's current team size, so a 3-player game doesn't show two names.
+export function playerNames(gs, team) {
+  const p = ((gs && gs.players && gs.players[team]) || []).filter(n => n);
+  if (p.length) return p;
+  const size = teamSize(gs);
+  return size === 3 ? ['Player 1', 'Player 2', 'Player 3'] : ['Player 1', 'Player 2'];
 }
 
 // Bumped only by a FULL reset (never a restart, never a single team
@@ -185,7 +190,7 @@ export function largestCluster(gs, team) {
 
 // ── INSTANT WIN ───────────────────────────────────────────────────
 // The winning post is more than half the areas' worth of points
-// (11 with 20 areas) — and BONUS points count towards it, so a team
+// (11 with 21 areas) — and BONUS points count towards it, so a team
 // can win on the spot with fewer areas plus bonuses.
 export function winThreshold(gs) {
   return Math.floor(Object.keys(gs.areas || {}).length / 2) + 1;

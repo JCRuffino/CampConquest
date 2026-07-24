@@ -288,10 +288,18 @@ export async function claimTeam(team) {
 // (e.g. a dead phone). RTDB deletes keys set to null.
 export async function releaseTeam(team) {
   const uid = await getUid();
-  let failReason = '';
 
+  // Nothing to do if the state hasn't loaded, or the team was never
+  // claimed (or was already released) — the desired end state already
+  // holds, so that's a success, not a failure with an empty reason
+  if (!gameState.data) return { ok: false, reason: 'Not connected — try again.' };
+  if (!gameState.data.teamClaims || !gameState.data.teamClaims[team]) return { ok: true };
+
+  let failReason = '';
   const committed = await mutateState(gs => {
-    if (!gs.teamClaims || !gs.teamClaims[team]) return;
+    // Already gone by the time the transaction runs (e.g. raced by
+    // another release) — commit the no-op so this still reports ok:true
+    if (!gs.teamClaims || !gs.teamClaims[team]) return gs;
     if (gs.teamClaims[team] !== uid && !isAdminMode()) {
       failReason = 'Another phone holds this team.';
       return;
@@ -300,7 +308,8 @@ export async function releaseTeam(team) {
     return gs;
   });
 
-  return { ok: committed, reason: failReason };
+  if (committed) return { ok: true };
+  return { ok: false, reason: failReason || 'Could not release — please try again.' };
 }
 
 // Admin: free an abandoned attempt — the area reopens to everyone

@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { toKey, formatCountdown, normalizeGameCode, fixArrays,
-         getScores, largestCluster, rankTeams,
+         getScores, largestCluster, rankTeams, playerNames,
          instantWinner, winThreshold, isGameOver } from '../shared.js';
 import { areaDefinitions, connections } from '../areas.js';
 
@@ -146,6 +146,13 @@ test('fixArrays restores containers Firebase strips', () => {
   assert.deepEqual(gs.areas.X.failedBy, [2]);
   assert.deepEqual(gs.attempts[1], {});
   assert.deepEqual(gs.players[3], []);
+});
+
+test('playerNames: empty-roster fallback is sized to teamSize; partial rosters are left alone', () => {
+  assert.deepEqual(playerNames({ players: { 1: [] }, teamSize: 2 }, 1), ['Player 1', 'Player 2']);
+  assert.deepEqual(playerNames({ players: { 1: [] }, teamSize: 3 }, 1), ['Player 1', 'Player 2', 'Player 3']);
+  assert.deepEqual(playerNames({ players: { 1: ['Alice'] }, teamSize: 3 }, 1), ['Alice']);
+  assert.deepEqual(playerNames({}, 1), ['Player 1', 'Player 2']); // no players/teamSize at all
 });
 
 test('isGameOver: winner or expired timer', () => {
