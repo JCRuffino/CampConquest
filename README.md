@@ -21,7 +21,7 @@ Built with vanilla JavaScript (ES modules), [Leaflet](https://leafletjs.com/) + 
 
 ## Setting up the real campsite
 
-1. **Zones** — the 21 festival zones in `areas.js` were placed by georeferencing the Strange Games Festival site map onto the real site boundary, so placements are close but not exact. To refine one: unlock admin mode in Settings, start the **Area Editor**, tap the zone on the map, drag its corner handles, press Copy Snippet, and paste it over that zone's entry in `areas.js`.
+1. **Zones** — the 21 festival zones in `areas.js` were placed by georeferencing the Strange Games Festival site map onto the real site boundary, so placements are close but not exact. `areas.js` is generated output of `tools/generate_areas.py` and must never be hand-edited. To refine a zone: unlock admin mode in Settings, start the **Area Editor**, tap the zone on the map, drag its corner handles, then press Copy — it copies a ready-made prompt (not raw coordinates) for an AI coding agent to update that zone's entry in `generate_areas.py`'s `zones` dict and rerun the generator.
 2. **Challenges** — edit `challenges.csv` (tab-separated). The `Area` column must exactly match the `name` in `areas.js`.
 3. **Site illustration (optional)** — to use a nicer hand-drawn map instead of raw OSM tiles, drop the image in this folder and set `SITE_IMAGE` at the top of `map.js` with the image URL and the lat/lng bounds it covers.
 

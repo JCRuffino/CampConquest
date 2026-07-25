@@ -29,8 +29,8 @@ function startEditor() {
   editorControl.innerHTML =
     '<div id="editor-hint" style="font-size:12px;font-weight:700;margin-bottom:6px;">✏️ Tap a zone to edit its corners</div>' +
     '<div style="display:flex;gap:6px;justify-content:center;">' +
-      '<button id="editor-copy" class="btn btn-success btn-sm" disabled>📋 Copy Zone</button>' +
-      '<button id="editor-copy-all" class="btn btn-primary btn-sm">📋 Copy ALL Zones</button>' +
+      '<button id="editor-copy" class="btn btn-success btn-sm" disabled>📋 Copy Update Prompt</button>' +
+      '<button id="editor-copy-all" class="btn btn-primary btn-sm">📋 Copy ALL as Prompt</button>' +
     '</div>';
   document.getElementById('screen-map').appendChild(editorControl);
 
@@ -124,39 +124,66 @@ function buildEditorHandles(layer) {
   });
 }
 
-function zoneSnippet(layer) {
+// The new corners for one zone, in the exact tuple syntax already used
+// in tools/generate_areas.py's `zones` dict, so an agent can paste this
+// straight in without reformatting
+function zoneCoordsLine(layer) {
   const ring = layer.polygon.getLatLngs()[0];
   return (
-    '  {\n' +
-    '    name: "' + layer.area.name.replace(/"/g, '\\"') + '",\n' +
-    '    polygon: [\n' +
-    ring.map(p => '      [' + p.lat.toFixed(6) + ', ' + p.lng.toFixed(6) + '],').join('\n') + '\n' +
-    '    ],\n' +
-    '  },\n'
+    ' "' + layer.area.name.replace(/"/g, '\\"') + '": [' +
+    ring.map(p => '(' + p.lat.toFixed(6) + ',' + p.lng.toFixed(6) + ')').join(',') +
+    '],'
   );
 }
 
-function sendToOutput(snippet) {
+// A ready-to-paste prompt for an AI coding agent, not raw polygon data —
+// areas.js is generated output (never hand-edited); the real edit target
+// is the `zones` dict in tools/generate_areas.py, followed by rerunning
+// the generator. Framing it as a self-contained agent prompt means a
+// fresh session (no memory of this conversation) can act on it directly.
+function agentPrompt(layers) {
+  const names   = layers.map(l => l.area.name);
+  const single  = layers.length === 1;
+  const subject = single ? '"' + names[0] + '" zone\'s' : names.length + ' zones\'';
+  const quoted  = names.map(n => '"' + n + '"').join(', ');
+
+  return (
+    'Update the ' + subject + ' traced shape in Camp Conquest ' +
+    '(C:\\Users\\josep\\Documents\\GitHub\\CampConquest).\n\n' +
+    'areas.js is GENERATED output of tools/generate_areas.py — never hand-edit areas.js ' +
+    'directly. In that file\'s `zones` dict, replace the entr' + (single ? 'y' : 'ies') +
+    ' for ' + quoted + ' with the new hand-traced corners below (same tuple format already ' +
+    'used in that dict). Leave every other zone, the connections list, and all area names ' +
+    'untouched.\n\n' +
+    'Then run `py tools/generate_areas.py` to regenerate areas.js and report the ' +
+    'verification output back to me — any new "WARN" line naming ' +
+    (single ? 'this zone' : 'one of these zones') + ' means a neighbouring border needs a ' +
+    'look too.\n\n' +
+    'Do not commit or push without telling me what changed first.\n\n' +
+    'New coordinates:\n' + layers.map(zoneCoordsLine).join('\n')
+  );
+}
+
+function sendToOutput(prompt) {
   const out = document.getElementById('editor-output');
   if (out) {
-    out.value += snippet;
+    out.value = prompt;
     out.parentElement.style.display = 'block';
   }
-  if (navigator.clipboard) navigator.clipboard.writeText(snippet).catch(() => {});
-  console.log('✏️ Area snippet:\n' + snippet);
+  if (navigator.clipboard) navigator.clipboard.writeText(prompt).catch(() => {});
+  console.log('✏️ Area agent prompt:\n' + prompt);
 }
 
 function copyEditorSnippet() {
   if (!editorKey) return;
   const layer = getAreaLayers()[editorKey];
-  sendToOutput(zoneSnippet(layer));
-  showInfo('✅ Copied', '"<strong>' + esc(layer.area.name) + '</strong>" copied to the clipboard (and to the box in Settings).<br><br>Paste it over that area\'s entry in areas.js — the change is only on this device until areas.js is updated.');
+  sendToOutput(agentPrompt([layer]));
+  showInfo('✅ Copied', 'An update prompt for "<strong>' + esc(layer.area.name) + '</strong>" is on the clipboard (and in the box in Settings).<br><br>Paste it to your AI coding agent — it\'ll update tools/generate_areas.py and regenerate areas.js for you.');
 }
 
 // Every zone's CURRENT shape (including local edits) in one go
 function copyAllZones() {
-  const layers  = getAreaLayers();
-  const snippet = Object.values(layers).map(zoneSnippet).join('');
-  sendToOutput(snippet);
-  showInfo('✅ Copied', 'All <strong>' + Object.keys(layers).length + '</strong> zones copied to the clipboard (and to the box in Settings).<br><br>Paste over the entries in areas.js.');
+  const layers = Object.values(getAreaLayers());
+  sendToOutput(agentPrompt(layers));
+  showInfo('✅ Copied', 'An update prompt for all <strong>' + layers.length + '</strong> zones is on the clipboard (and in the box in Settings).<br><br>Paste it to your AI coding agent — it\'ll update tools/generate_areas.py and regenerate areas.js for you.');
 }
