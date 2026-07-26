@@ -26,9 +26,9 @@ function makeState(owners = {}, extra = {}) {
   return { areas, attempts: { 1: {}, 2: {}, 3: {} }, ...extra };
 }
 
-test('all 21 zones and 35 connections are present', () => {
+test('all 21 zones and 37 connections are present', () => {
   assert.equal(areaDefinitions.length, 21);
-  assert.equal(connections.length, 35);
+  assert.equal(connections.length, 37);
   // every connection endpoint is a real zone
   const names = new Set(areaDefinitions.map(d => d.name));
   connections.flat().forEach(n => assert.ok(names.has(n), n + ' is not a zone'));

@@ -4,7 +4,7 @@
 // popup re-renders itself when the area's state changes remotely.
 
 import { states, gameState, toKey, getMyTeam, esc, teamName, teamSize,
-         hasStarted, getCurrentAttempt, isAdminMode, formatCountdown } from './shared.js';
+         hasStarted, getCurrentAttempt, isAdminMode, formatCountdown, connectedKeys } from './shared.js';
 import { claimArea, failChallenge, startAttempt, adminSetArea, adminClearAttempt } from './actions.js';
 import { showModal, showConfirm, showPrompt } from './modal.js';
 import { setWakeLock } from './wakelock.js';
@@ -23,10 +23,17 @@ function buildSig(gs, key) {
   if (!a) return '';
   const myTeam = getMyTeam();
   const att    = myTeam !== null ? getCurrentAttempt(gs, myTeam, key) : null;
+  // Neighbours' owner/lock are shown in the "Connected to" list, so a
+  // change there must also trigger a re-render, not just a change to
+  // this area's own state
+  const neighbours = connectedKeys(key).map(nk => {
+    const na = gs.areas && gs.areas[nk];
+    return na ? na.owner + ':' + (na.locked ? 1 : 0) : '';
+  }).join(',');
   return JSON.stringify([
     a.owner, !!a.locked, a.attemptingBy || 0, (a.failedBy || []).join(','),
     a.result || '', a.era || 0, a.passMark || '', att ? att.startedAt : 0,
-    !!gs.winner,
+    !!gs.winner, neighbours,
   ]);
 }
 
@@ -83,6 +90,28 @@ export function openAreaPopup(area, latlng) {
       ? 'Unclaimed'
       : 'Claimed by ' + esc(teamName(gs, a.owner)) + ' — can be stolen';
 
+  // Connected zones and their current status — visible to everyone,
+  // not gated by "revealed", since it's board/scoring info, not a
+  // secret challenge. Not the same as visually touching on the map;
+  // this is exactly the connections list scoring actually uses.
+  const neighbourChips = connectedKeys(key).map(nk => {
+    const na = gs.areas && gs.areas[nk];
+    if (!na) return '';
+    const label = na.locked
+      ? '🔒 ' + esc(na.displayName)
+      : na.owner === 0
+        ? esc(na.displayName)
+        : esc(na.displayName) + ' (' + esc(teamName(gs, na.owner)) + ')';
+    return '<span style="display:inline-block;background:#f3f4f6;color:#374151;border-radius:8px;' +
+      'padding:2px 8px;margin:3px 4px 0 0;font-size:11px;">' + label + '</span>';
+  }).join('');
+  const neighboursHTML = neighbourChips
+    ? '<div style="margin-top:6px;">' +
+        '<div style="font-size:11px;font-weight:700;color:#6b7280;">🔗 Connected to</div>' +
+        neighbourChips +
+      '</div>'
+    : '';
+
   let body = '';
   let actionsHTML = '';
 
@@ -124,6 +153,7 @@ export function openAreaPopup(area, latlng) {
         '❓ The challenge here is secret until your team starts an attempt.' +
       '</div>';
   }
+  body = neighboursHTML + body;
 
   if ((a.failedBy || []).length > 0) {
     body += '<div style="font-size:11px;color:#9ca3af;margin-top:6px;">Locked out (failed): ' +

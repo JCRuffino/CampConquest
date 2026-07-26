@@ -7,7 +7,7 @@ import { pushPlayerLocation, removePlayerLocation, listenToPlayerLocations } fro
 import { states, gameState, toKey, getMyTeam, esc, teamName, pointInPolygon } from './shared.js';
 import { openAreaPopup, popupSync } from './popup.js';
 import { isEditorActive, selectEditorZone } from './editor.js';
-import { siteBoundary } from './areas.js';
+import { siteBoundary, connections } from './areas.js';
 
 export { toggleAreaEditor } from './editor.js';
 
@@ -113,12 +113,70 @@ function polygonCentre(coords, leafletPolygon) {
   return leafletPolygon.getBounds().getCenter();
 }
 
+// ── LINKED-ZONE VISUAL BRIDGES ──────────────────────────────────────
+// The no-man's-land hatch (below) is literally "site boundary minus
+// every zone's own traced shape" — so a small trace-alignment gap
+// between two LINKED zones hatches exactly like a real gap between
+// unlinked ones, contradicting the rule that touching = connected.
+// Gameplay adjacency always comes from the connections list, not
+// geometry, so patch the visual gap: a thin quad across the shortest
+// distance between the two zones, added as an extra hole alongside
+// the zones themselves. Only ever fills in — never changes gameplay.
+function metresBetween(p, q) {
+  const kx = 111320 * Math.cos(50.86 * Math.PI / 180), ky = 111320;
+  const dx = (q[1] - p[1]) * kx, dy = (q[0] - p[0]) * ky;
+  return Math.hypot(dx, dy);
+}
+function closestOnSegment(p, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const L2 = dx * dx + dy * dy;
+  const t = L2 === 0 ? 0 : Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
+  return [a[0] + t * dx, a[1] + t * dy];
+}
+// Nearest point on ring B's boundary to any point on ring A's boundary
+// (checked both directions) — good enough for a cosmetic connector,
+// not a rigorous polygon-distance calculation
+function closestPair(ringA, ringB) {
+  let best = null;
+  [[ringA, ringB, false], [ringB, ringA, true]].forEach(([r1, r2, swapped]) => {
+    r1.forEach(p => {
+      for (let j = 0; j < r2.length; j++) {
+        const q = closestOnSegment(p, r2[j], r2[(j + 1) % r2.length]);
+        const d = metresBetween(p, q);
+        if (!best || d < best.d) best = swapped ? { d, pa: q, pb: p } : { d, pa: p, pb: q };
+      }
+    });
+  });
+  return best;
+}
+function connectorBridge(ringA, ringB) {
+  if (!ringA || !ringB) return null;
+  const { d, pa, pb } = closestPair(ringA, ringB);
+  if (d < 0.5 || d > 15) return null; // already touching/overlapping, or too far to sensibly bridge
+  const dLat = pb[0] - pa[0], dLng = pb[1] - pa[1];
+  const len = Math.hypot(dLat, dLng) || 1;
+  const wLat = -dLng / len, wLng = dLat / len; // unit perpendicular, in degrees
+  const halfW = 0.00004; // ~3-4m at this latitude — a strip, not a hairline
+  return [
+    [pa[0] + wLat * halfW, pa[1] + wLng * halfW],
+    [pb[0] + wLat * halfW, pb[1] + wLng * halfW],
+    [pb[0] - wLat * halfW, pb[1] - wLng * halfW],
+    [pa[0] - wLat * halfW, pa[1] - wLng * halfW],
+  ];
+}
+
 export function addAreas(areas) {
   // Ground that belongs to no zone (gaps between unlinked zones, the
   // southern woodland) renders as light grey hatching: the site polygon
   // with every zone cut out as a hole, drawn under the zones
+  const byName = {};
+  areas.forEach(a => { byName[a.name] = a.polygon; });
+  const bridges = connections
+    .map(([a, b]) => connectorBridge(byName[a], byName[b]))
+    .filter(Boolean);
+
   const noMansLand = L.polygon(
-    [siteBoundary].concat(areas.map(a => a.polygon)),
+    [siteBoundary].concat(areas.map(a => a.polygon)).concat(bridges),
     { stroke: false, fillColor: '#9ca3af', fillOpacity: 0.45, interactive: false }
   ).addTo(map);
   ensureHatchPatterns();

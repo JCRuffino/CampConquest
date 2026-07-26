@@ -160,6 +160,12 @@ connections.forEach(([a, b]) => {
   (adjacency[kb] = adjacency[kb] || []).push(ka);
 });
 
+// The zone keys directly connected to a given zone key — used by the
+// area popup to list neighbours, and by largestCluster below for scoring
+export function connectedKeys(key) {
+  return adjacency[key] || [];
+}
+
 export function largestCluster(gs, team) {
   const owned = new Set(
     Object.entries(gs.areas || {})
