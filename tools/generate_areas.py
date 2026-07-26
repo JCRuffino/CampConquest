@@ -64,119 +64,23 @@ def unplane(q): return (q[1]/KY+LAT0, q[0]/KX+LNG0)
 zs  = [[plane(p) for p in zones[n]] for n in names]
 bnd = [plane(p) for p in boundary]
 
-def centroid(poly):
-    A = Cx = Cy = 0.0
-    for i in range(len(poly)):
-        x1, y1 = poly[i]; x2, y2 = poly[(i+1) % len(poly)]
-        cr = x1*y2 - x2*y1
-        A += cr; Cx += (x1+x2)*cr; Cy += (y1+y2)*cr
-    A /= 2
-    return (Cx/(6*A), Cy/(6*A))
+# ── VALIDATE, DON'T SYNTHESISE ──────────────────────────────────────
+# Earlier versions rebuilt every zone from scratch (centroid -> convex
+# hull -> Voronoi-bisector clip against every other zone's centroid).
+# That guaranteed tidy borders but silently discarded whatever Joseph
+# actually traced — concave shapes got flattened to a handful of
+# corners, and a big edit to one edge could vanish almost entirely if
+# it didn't move the shape's centroid much, while a small edit could
+# swing the result a long way. Edits stopped landing predictably.
+#
+# So: the traced shape IS the shape. No reshaping, no auto-clipping to
+# the site boundary. The checks below only ever WARN — they never
+# change a coordinate — so Joseph can see exactly what to nudge in the
+# Area Editor and re-trace it precisely, on-site if needed.
+cells = zs
 
-def convex_hull(pts):
-    pts = sorted(set(pts))
-    if len(pts) <= 2: return pts
-    def half(seq):
-        out = []
-        for p in seq:
-            while len(out) >= 2 and (out[-1][0]-out[-2][0])*(p[1]-out[-2][1]) - (out[-1][1]-out[-2][1])*(p[0]-out[-2][0]) <= 0:
-                out.pop()
-            out.append(p)
-        return out
-    lo = half(pts); hi = half(pts[::-1])
-    return lo[:-1] + hi[:-1]
-
-def clip_edge(subject, p1, p2):
-    def inside(p):
-        return (p2[0]-p1[0])*(p[1]-p1[1]) - (p2[1]-p1[1])*(p[0]-p1[0]) >= 0
-    def inter(a, b):
-        dc = (p1[0]-p2[0], p1[1]-p2[1]); dp = (a[0]-b[0], a[1]-b[1])
-        n1 = p1[0]*p2[1] - p1[1]*p2[0]; n2 = a[0]*b[1] - a[1]*b[0]
-        den = dc[0]*dp[1] - dc[1]*dp[0]
-        if den == 0: return a
-        return ((n1*dp[0]-n2*dc[0])/den, (n1*dp[1]-n2*dc[1])/den)
-    out = []
-    for i in range(len(subject)):
-        cur, prev = subject[i], subject[i-1]
-        if inside(cur):
-            if not inside(prev): out.append(inter(prev, cur))
-            out.append(cur)
-        elif inside(prev):
-            out.append(inter(prev, cur))
-    return out
-
-def polygon_ccw(poly):
-    s = sum((poly[(i+1) % len(poly)][0]-poly[i][0]) * (poly[(i+1) % len(poly)][1]+poly[i][1]) for i in range(len(poly)))
-    return poly if s < 0 else poly[::-1]
-
-def clip_convex(subject, convex_clip):
-    convex_clip = polygon_ccw(convex_clip)
-    out = subject
-    for i in range(len(convex_clip)):
-        if not out: return []
-        out = clip_edge(out, convex_clip[i], convex_clip[(i+1) % len(convex_clip)])
-    return out
-
-def bisector_line(a, b, inset):
-    mx, my = (a[0]+b[0])/2, (a[1]+b[1])/2
-    dx, dy = b[0]-a[0], b[1]-a[1]
-    dl = math.hypot(dx, dy) or 1
-    ux, uy = dx/dl, dy/dl
-    mx -= ux*inset; my -= uy*inset
-    ex, ey = -uy, ux
-    T = 10000
-    p1, p2 = (mx-ex*T, my-ey*T), (mx+ex*T, my+ey*T)
-    if (p2[0]-p1[0])*(a[1]-p1[1]) - (p2[1]-p1[1])*(a[0]-p1[0]) < 0:
-        p1, p2 = p2, p1
-    return p1, p2
-
-GAP = 4.0
-def expand_for(name):
-    if name == "Shops": return 2.5
-    # these zones need extra reach so their linked borders actually meet
-    if name in ("Willows 5", "Willows 2", "Birches 2", "Birches 3", "Oaks 2"): return 2.0
-    return 1.45
-
-def gap_for(i, j):
-    return GAP
-
-# Birches 3 and Oaks 2 are linked but meet diagonally at a four-corner
-# where Birches 2 / Oaks 3 pinch between them, so those splits are
-# WEIGHTED: the first-named zone gains this many metres from the second
-# (both sides clip at the same shifted line — still touching, no overlap)
-SHIFT = {
-    ("Birches 3", "Oaks 3"):   10.0,
-    ("Oaks 2",    "Oaks 3"):   10.0,
-    ("Birches 3", "Birches 2"): 10.0,
-    ("Oaks 2",    "Birches 2"): 10.0,
-    # Shops/Beeches pinch at their four-corner with Arena / Birches 2
-    ("Shops",   "Arena"):      5.0,
-    ("Beeches", "Arena"):      5.0,
-    ("Beeches", "Birches 2"):  5.0,
-}
-
-def linked_inset(i, j):
-    if (names[i], names[j]) in SHIFT: return -SHIFT[(names[i], names[j])]
-    if (names[j], names[i]) in SHIFT: return  SHIFT[(names[j], names[i])]
-    return 0.0
-
-seeds = [centroid(p) for p in zs]
-cells = []
-for i, poly in enumerate(zs):
-    c = seeds[i]
-    F = expand_for(names[i])
-    grown = convex_hull([(c[0]+(x-c[0])*F, c[1]+(y-c[1])*F) for x, y in poly])
-    cell = clip_convex(bnd, grown)
-    for j in range(len(zs)):
-        if i == j or not cell: continue
-        inset = linked_inset(i, j) if (i, j) in conn_idx else gap_for(i, j)
-        p1, p2 = bisector_line(seeds[i], seeds[j], inset)
-        cell = clip_edge(cell, p1, p2)
-    if len(cell) < 3:
-        print("EMPTY CELL:", names[i]); cell = poly
-    cells.append(cell)
-
-# ── Verify: linked pairs touch, unlinked pairs gap, no overlaps ────
+# ── Verify: linked pairs touch, unlinked pairs gap, nothing crosses
+#    itself, nothing overlaps a neighbour, nothing strays off-site ──
 def seg_dist(p, a, b):
     ax, ay = a; bx, by = b; px, py = p
     dx, dy = bx-ax, by-ay
@@ -193,8 +97,44 @@ def poly_min_dist(P, Q):
                 d = min(d, seg_dist(p, poly2[k], poly2[(k+1) % len(poly2)]))
     return d
 
+def seg_intersect(a1, a2, b1, b2):
+    def cross(o, a, b): return (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0])
+    d1 = cross(b1, b2, a1); d2 = cross(b1, b2, a2)
+    d3 = cross(a1, a2, b1); d4 = cross(a1, a2, b2)
+    return ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0)) and \
+           ((d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0))
+
+def self_intersects(poly):
+    n = len(poly)
+    for i in range(n):
+        for j in range(i+1, n):
+            if abs(i - j) <= 1 or (i == 0 and j == n-1): continue  # adjacent edges share a vertex
+            if seg_intersect(poly[i], poly[(i+1) % n], poly[j], poly[(j+1) % n]):
+                return True
+    return False
+
+def point_in_poly(p, poly):
+    x, y = p; inside = False; n = len(poly)
+    for i in range(n):
+        x1, y1 = poly[i]; x2, y2 = poly[(i+1) % n]
+        if ((y1 > y) != (y2 > y)) and (x < (x2-x1)*(y-y1)/(y2-y1) + x1):
+            inside = not inside
+    return inside
+
+def polys_overlap(P, Q):
+    n, m = len(P), len(Q)
+    for i in range(n):
+        for j in range(m):
+            if seg_intersect(P[i], P[(i+1) % n], Q[j], Q[(j+1) % m]):
+                return True
+    return any(point_in_poly(p, Q) for p in P) or any(point_in_poly(q, P) for q in Q)
+
 problems = 0
 for i in range(len(cells)):
+    if self_intersects(cells[i]):
+        print(f"WARN self-intersecting: {names[i]}"); problems += 1
+    if any(not point_in_poly(p, bnd) for p in cells[i]):
+        print(f"WARN outside the site boundary: {names[i]}"); problems += 1
     for j in range(i+1, len(cells)):
         d = poly_min_dist(cells[i], cells[j])
         linked = (i, j) in conn_idx
@@ -202,6 +142,8 @@ for i in range(len(cells)):
             print(f"WARN linked but gap {d:.1f} m: {names[i]} <-> {names[j]}"); problems += 1
         if not linked and d < 3.0:
             print(f"WARN unlinked but only {d:.1f} m apart: {names[i]} <-> {names[j]}"); problems += 1
+        if polys_overlap(cells[i], cells[j]):
+            print(f"WARN overlap: {names[i]} <-> {names[j]}"); problems += 1
 print("verification done,", problems, "warnings")
 
 # ── Emit areas.js ─────────────────────────────────────────────────
@@ -211,11 +153,14 @@ def fmt(poly, ind):
 
 out = []
 out.append("// ── CAMPSITE AREAS — Bushy Wood Activity Centre ───────────────────")
-out.append("// The 21 zones of the Strange Games Festival, based on Joseph's")
-out.append("// hand-traced shapes (2026-07-15), adjusted so that LINKED zones")
-out.append("// share a border, unlinked neighbours have a clear gap, and nothing")
-out.append("// overlaps. Ground belonging to no zone renders as grey hatching.")
-out.append("// Re-trace any zone with the in-app Area Editor (Settings, admin only).")
+out.append("// The 21 zones of the Strange Games Festival, exactly as Joseph")
+out.append("// hand-traced them — the generator validates (checks gaps, overlaps,")
+out.append("// self-intersections, the site boundary) but never reshapes what was")
+out.append("// traced. So borders may have a small gap or overlap where two")
+out.append("// independently-traced zones don't quite line up; re-trace with the")
+out.append("// in-app Area Editor (Settings, admin only) to tighten one up, and")
+out.append("// check tools/generate_areas.py's own printed warnings after.")
+out.append("// Ground belonging to no zone renders as grey hatching.")
 out.append("//")
 out.append("// Coordinates are [lat, lng]. Challenge text lives in challenges.csv.")
 out.append("")
