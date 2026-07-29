@@ -229,11 +229,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const gs   = gameState.data;
     // Chapel's silent-count challenge hides its own timer so players
     // can't time themselves off it — hide the main game clock too
-    // while that's running, or it'd serve the same purpose
+    // while that's running, or it'd serve the same purpose.
+    // attemptingBy is the authoritative "still mid-attempt" flag: it's
+    // cleared by both claim and fail, whereas the attempt record itself
+    // survives a fail (only a claim bumps the era), which would
+    // otherwise leave this team with no game clock for the rest of
+    // the game after failing the challenge.
     const myTeam = getMyTeam();
-    if (myTeam && allAreas.some(area => {
+    if (myTeam && gs && gs.areas && allAreas.some(area => {
       if (!area.timer || !area.timer.hidden) return false;
-      const att = getCurrentAttempt(gs, myTeam, toKey(area.name));
+      const key = toKey(area.name);
+      const a   = gs.areas[key];
+      if (!a || a.attemptingBy !== myTeam) return false;
+      const att = getCurrentAttempt(gs, myTeam, key);
       return att && att.startedAt;
     })) {
       pill.style.display = 'none';

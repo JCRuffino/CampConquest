@@ -259,9 +259,17 @@ export async function startAttempt(key, team, expected, { manualStart = false } 
 // actually ready, which is when the (possibly hidden) timer truly
 // begins. Idempotent — a second press once running is a harmless no-op.
 export async function startTimer(key, team) {
+  if (gameOverGuard(gameState.data)) return { ok: false, reason: null };
+
   let failReason = '';
 
   const committed = await mutateState(gs => {
+    // Re-check inside the transaction too: a client whose cache hasn't
+    // caught up yet must not start a timer after the game has been won
+    if (gs.winner) {
+      failReason = 'The game is already won!';
+      return;
+    }
     const a = gs.areas && gs.areas[key];
     const att = gs.attempts && gs.attempts[team] && gs.attempts[team][key];
     if (!a || !att || (att.era || 0) !== (a.era || 0)) {

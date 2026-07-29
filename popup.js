@@ -207,13 +207,17 @@ export function openAreaPopup(area, latlng) {
       '</div>';
   } else if (area.timer && area.timer.manualStart && !attempt.startedAt) {
     // Revealed, but the team hasn't started the (possibly hidden) timer
-    // yet — no claim/fail buttons until they do
+    // yet. No claim button until they do — but they must still be able
+    // to give up here, or the only way out would be to start a timer
+    // they've already decided not to run.
     actionsHTML =
       '<button id="starttimer-btn" class="btn btn-full" style="margin-top:10px;background:' +
       states[myTeam].color + ';">▶️ Start the Timer</button>' +
       '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center;">' +
         'Press this the moment you\'re ready to begin — not before.' +
-      '</div>';
+      '</div>' +
+      '<button id="fail-btn" class="btn btn-neutral btn-full" style="margin-top:6px;">' +
+        (isUnclaimed ? '❌ We Failed' : '❌ We Failed / Gave Up') + '</button>';
   } else {
     // Attempt in progress — timer (if any) and resolve buttons
     if (area.timer && area.timer.hidden) {
