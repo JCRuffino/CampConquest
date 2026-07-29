@@ -5,7 +5,7 @@
 
 import { states, gameState, toKey, getMyTeam, esc, teamName, teamSize,
          hasStarted, getCurrentAttempt, isAdminMode, formatCountdown, connectedKeys } from './shared.js';
-import { claimArea, failChallenge, startAttempt, adminSetArea, adminClearAttempt } from './actions.js';
+import { claimArea, failChallenge, startAttempt, startTimer, adminSetArea, adminClearAttempt } from './actions.js';
 import { showModal, showConfirm, showPrompt } from './modal.js';
 import { setWakeLock } from './wakelock.js';
 import { getMap, getAreaLayers } from './map.js';
@@ -162,7 +162,7 @@ export function openAreaPopup(area, latlng) {
 
   if (a.attemptingBy && !a.locked) {
     const attRec = (gs.attempts && gs.attempts[a.attemptingBy] && gs.attempts[a.attemptingBy][key]) || null;
-    const age    = attRec ? ' (started ' + minutesAgo(attRec.startedAt) + ')' : '';
+    const age    = attRec && attRec.startedAt ? ' (started ' + minutesAgo(attRec.startedAt) + ')' : '';
     body += '<div style="font-size:12px;color:#e63946;font-weight:700;margin-top:6px;">' +
       (a.owner !== 0 ? '⚔️ ' : '⏳ ') + esc(teamName(gs, a.attemptingBy)) +
       (a.owner !== 0 ? ' is contesting this area — win or lose, it locks!' : ' is attempting this challenge!') +
@@ -189,21 +189,40 @@ export function openAreaPopup(area, latlng) {
       : '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
         '🚫 Too late — ' + esc(teamName(gs, a.attemptingBy)) + ' got here first. Only one team can contest a claimed area.</div>';
   } else if (!attempt) {
-    // Not started yet — starting reveals the challenge (and any timer,
-    // which begins immediately: no warning, that's the fun) and commits
-    // the team to a pass or a fail
+    // Not started yet — starting reveals the challenge and commits the
+    // team to a pass or a fail. Any NORMAL timer begins immediately, no
+    // warning, that's the fun; a manualStart timer (Chapel's silent
+    // count) instead waits for the team to press Start Timer themselves
+    const manual = !!(area.timer && area.timer.manualStart);
     actionsHTML =
       '<button id="start-btn" class="btn btn-full" style="margin-top:10px;background:' +
       states[myTeam].color + ';">▶️ Start Challenge Attempt</button>' +
       '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center;">' +
         'Only press this when your team is <strong>at this area</strong> and ready — ' +
-        'it reveals the challenge and starts any timer. ' +
+        (manual
+          ? 'it reveals the challenge; you start the timer yourselves, when ready. '
+          : 'it reveals the challenge and starts any timer. ') +
         '<strong>This can\'t be undone once you start.</strong>' +
         (isUnclaimed ? '' : ' Stealing shuts the other team out — win or lose, this area locks.') +
       '</div>';
+  } else if (area.timer && area.timer.manualStart && !attempt.startedAt) {
+    // Revealed, but the team hasn't started the (possibly hidden) timer
+    // yet — no claim/fail buttons until they do
+    actionsHTML =
+      '<button id="starttimer-btn" class="btn btn-full" style="margin-top:10px;background:' +
+      states[myTeam].color + ';">▶️ Start the Timer</button>' +
+      '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center;">' +
+        'Press this the moment you\'re ready to begin — not before.' +
+      '</div>';
   } else {
     // Attempt in progress — timer (if any) and resolve buttons
-    if (area.timer) {
+    if (area.timer && area.timer.hidden) {
+      body +=
+        '<div style="margin-top:10px;text-align:center;background:#111827;color:white;' +
+          'border-radius:10px;padding:8px;font-size:12px;">' +
+          '⏱️ Timer running — deliberately hidden, don\'t peek at any other clock!' +
+        '</div>';
+    } else if (area.timer) {
       const timerLabel = area.timer.mode === 'down'
         ? area.timer.minutes + '-minute countdown'
         : 'time elapsed';
@@ -243,9 +262,10 @@ export function openAreaPopup(area, latlng) {
     openAreaPopup(area, latlng);
   }
 
-  // Live ticker for the attempt timer
+  // Live ticker for the attempt timer (never rendered at all for a
+  // hidden timer — see the actionsHTML branches above)
   const timerEl = content.querySelector('#attempt-timer');
-  if (timerEl && attempt && area.timer) {
+  if (timerEl && attempt && attempt.startedAt && area.timer) {
     const tick = () => {
       if (!timerEl.isConnected) { clearInterval(intv); return; }
       const elapsed = Date.now() - attempt.startedAt;
@@ -268,9 +288,22 @@ export function openAreaPopup(area, latlng) {
     // appear together with a single tap, not after a second screen.
     busy = true;
     try {
-      const res = await startAttempt(key, myTeam, expected);
+      const manual = !!(area.timer && area.timer.manualStart);
+      const res = await startAttempt(key, myTeam, expected, { manualStart: manual });
       if (!res.ok) { showError(res.reason); return; }
       setWakeLock(true);
+    } finally {
+      busy = false;
+    }
+    reopen();
+  });
+
+  const startTimerBtn = content.querySelector('#starttimer-btn');
+  if (startTimerBtn) startTimerBtn.addEventListener('click', async () => {
+    busy = true;
+    try {
+      const res = await startTimer(key, myTeam);
+      if (!res.ok) { showError(res.reason); return; }
     } finally {
       busy = false;
     }

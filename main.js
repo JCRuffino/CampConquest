@@ -5,7 +5,7 @@ import { initSettings } from './settings.js';
 import { renderAll } from './ui.js';
 import { allAreas, gameState, fixArrays, toKey, esc, states, bonusSets,
          formatCountdown, getGameCode, setGameCode, normalizeGameCode,
-         getScores, rankTeams, teamName } from './shared.js';
+         getScores, rankTeams, teamName, getMyTeam, getCurrentAttempt } from './shared.js';
 import { showModal } from './modal.js';
 import { areaDefinitions } from './areas.js';
 
@@ -227,6 +227,18 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(() => {
     const pill = document.getElementById('countdown-pill');
     const gs   = gameState.data;
+    // Chapel's silent-count challenge hides its own timer so players
+    // can't time themselves off it — hide the main game clock too
+    // while that's running, or it'd serve the same purpose
+    const myTeam = getMyTeam();
+    if (myTeam && allAreas.some(area => {
+      if (!area.timer || !area.timer.hidden) return false;
+      const att = getCurrentAttempt(gs, myTeam, toKey(area.name));
+      return att && att.startedAt;
+    })) {
+      pill.style.display = 'none';
+      return;
+    }
     // A majority win trumps the countdown
     if (gs && gs.winner) {
       pill.style.display = 'block';
@@ -290,9 +302,16 @@ document.addEventListener('DOMContentLoaded', () => {
       // Tab-separated: Area, Challenge, Pass Mark, Timer — challenge
       // text can freely contain commas. Timer values: "countdown N"
       // (N minutes counting down), "countup" (stopwatch), or empty.
+      // "countup manual": the team starts the timer themselves on a
+      // second button once they're ready (not the instant the
+      // challenge is revealed) — e.g. Oaks 4, so it doesn't start
+      // before the object is actually balanced. Add "hidden" (e.g.
+      // "countup manual hidden", currently only Chapel's silent count)
+      // if the running time must never be shown to them — see popup.js.
       function parseTimer(s) {
         s = (s || '').trim().toLowerCase();
         if (!s) return null;
+        if (s.includes('manual')) return { mode: 'up', manualStart: true, hidden: s.includes('hidden') };
         if (s.includes('countup') || s === 'up') return { mode: 'up' };
         const m = s.match(/(\d+)/);
         if (s.includes('countdown') && m) return { mode: 'down', minutes: parseInt(m[1]) };

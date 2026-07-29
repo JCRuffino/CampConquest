@@ -188,7 +188,10 @@ export async function failChallenge(key, team, expected) {
 // Start a challenge attempt: reveals the challenge text to the team
 // (permanently) and starts any timer. Starting commits the team to
 // recording a pass or a fail.
-export async function startAttempt(key, team, expected) {
+// manualStart (rare — currently only Chapel's silent count): the timer
+// does NOT start yet; startedAt is left null until the team calls
+// startTimer() below, once they're actually ready to begin.
+export async function startAttempt(key, team, expected, { manualStart = false } = {}) {
   if (gameOverGuard(gameState.data)) return { ok: false, reason: null };
 
   let failReason = '';
@@ -228,7 +231,7 @@ export async function startAttempt(key, team, expected) {
     a.attemptingBy = team;
     if (!gs.attempts) gs.attempts = {};
     if (!gs.attempts[team]) gs.attempts[team] = {};
-    gs.attempts[team][key] = { startedAt: Date.now(), era: a.era || 0 };
+    gs.attempts[team][key] = { startedAt: manualStart ? null : Date.now(), era: a.era || 0 };
     return gs;
   });
 
@@ -249,6 +252,28 @@ export async function startAttempt(key, team, expected) {
       : '▶️ ' + teamName(gs, team) + ' started the challenge at ' + name,
   });
 
+  return { ok: true };
+}
+
+// For manualStart zones only: the team presses this once they're
+// actually ready, which is when the (possibly hidden) timer truly
+// begins. Idempotent — a second press once running is a harmless no-op.
+export async function startTimer(key, team) {
+  let failReason = '';
+
+  const committed = await mutateState(gs => {
+    const a = gs.areas && gs.areas[key];
+    const att = gs.attempts && gs.attempts[team] && gs.attempts[team][key];
+    if (!a || !att || (att.era || 0) !== (a.era || 0)) {
+      failReason = 'This attempt is no longer active — reopen the area.';
+      return;
+    }
+    if (att.startedAt) return gs; // already running — no-op
+    att.startedAt = Date.now();
+    return gs;
+  });
+
+  if (!committed) return { ok: false, reason: failReason || 'Could not start the timer — please try again.' };
   return { ok: true };
 }
 
