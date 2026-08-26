@@ -191,10 +191,25 @@ export async function failChallenge(key, team, expected) {
 // manualStart (rare — currently only Chapel's silent count): the timer
 // does NOT start yet; startedAt is left null until the team calls
 // startTimer() below, once they're actually ready to begin.
-export async function startAttempt(key, team, expected, { manualStart = false } = {}) {
+// A fresh random A-Z string (repeats allowed) for sequence challenges.
+// Generated OUTSIDE the transaction on purpose: a mutator can be re-run
+// on retry, which would otherwise reroll the letters mid-commit.
+const SEQ_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+function randomLetters(n) {
+  let out = '';
+  for (let i = 0; i < n; i++) {
+    out += SEQ_LETTERS[Math.floor(Math.random() * SEQ_LETTERS.length)];
+  }
+  return out;
+}
+
+export async function startAttempt(key, team, expected, { manualStart = false, sequence = null } = {}) {
   if (gameOverGuard(gameState.data)) return { ok: false, reason: null };
 
   let failReason = '';
+  const letters = (sequence && sequence.kind === 'letters')
+    ? randomLetters(sequence.count)
+    : null;
 
   const committed = await mutateState(gs => {
     const a = gs.areas && gs.areas[key];
@@ -231,7 +246,11 @@ export async function startAttempt(key, team, expected, { manualStart = false } 
     a.attemptingBy = team;
     if (!gs.attempts) gs.attempts = {};
     if (!gs.attempts[team]) gs.attempts[team] = {};
-    gs.attempts[team][key] = { startedAt: manualStart ? null : Date.now(), era: a.era || 0 };
+    gs.attempts[team][key] = {
+      startedAt: manualStart ? null : Date.now(),
+      era: a.era || 0,
+      ...(letters ? { letters, letterIdx: 0 } : {}),
+    };
     return gs;
   });
 
@@ -282,6 +301,38 @@ export async function startTimer(key, team) {
   });
 
   if (!committed) return { ok: false, reason: failReason || 'Could not start the timer — please try again.' };
+  return { ok: true };
+}
+
+// Sequence challenges only: bank the current item and move to the next.
+// The running count IS the team's score, so this is the scoring action —
+// it stops at the end of the list rather than wrapping or overrunning.
+export async function advanceSequence(key, team) {
+  if (gameOverGuard(gameState.data)) return { ok: false, reason: null };
+
+  let failReason = '';
+
+  const committed = await mutateState(gs => {
+    if (gs.winner) {
+      failReason = 'The game is already won!';
+      return;
+    }
+    const a   = gs.areas && gs.areas[key];
+    const att = gs.attempts && gs.attempts[team] && gs.attempts[team][key];
+    if (!a || !att || (att.era || 0) !== (a.era || 0)) {
+      failReason = 'This attempt is no longer active — reopen the area.';
+      return;
+    }
+    if (!att.letters) {
+      failReason = 'This challenge has no sequence to advance.';
+      return;
+    }
+    if ((att.letterIdx || 0) >= att.letters.length) return gs; // already at the end — no-op
+    att.letterIdx = (att.letterIdx || 0) + 1;
+    return gs;
+  });
+
+  if (!committed) return { ok: false, reason: failReason || 'Could not move on — please try again.' };
   return { ok: true };
 }
 

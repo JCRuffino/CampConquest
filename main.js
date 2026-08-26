@@ -327,6 +327,19 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
       }
 
+      // Sequence: the app itself feeds the team a one-at-a-time list to
+      // work through, and their score is how many they completed before
+      // stopping (currently only Meadow's semaphore letters). Value:
+      // "letters N" for N random A-Z letters, repeats allowed.
+      function parseSequence(s) {
+        s = (s || '').trim().toLowerCase();
+        if (!s) return null;
+        const m = s.match(/(\d+)/);
+        if (s.includes('letters') && m) return { kind: 'letters', count: parseInt(m[1]) };
+        console.warn('⚠️ Unrecognised sequence value in challenges.csv:', s);
+        return null;
+      }
+
       const byName = {};
       const lines  = challengesCsv.trim().split('\n');
       lines.shift();
@@ -339,7 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // when the game is set to 2 players per team (some challenges
         // need a genuinely different version, not just a reworded one,
         // e.g. a 3-person relay/teach chain has no middle link with 2).
-        const [name, challenge, passMark, timer, info, answer, challenge2p, passMark2p] = line.split('\t');
+        const [name, challenge, passMark, timer, info, answer, challenge2p, passMark2p, sequence] = line.split('\t');
         if (!name) return;
         const ans = parseFloat(answer);
         byName[name.trim()] = {
@@ -350,6 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
           answer:      isNaN(ans) ? null : ans,
           challenge2p: (challenge2p || '').trim(),
           passMark2p:  (passMark2p || '').trim(),
+          sequence:    parseSequence(sequence),
         };
       });
 
@@ -366,6 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
           answer:      ch ? ch.answer : null,
           challenge2p: ch ? ch.challenge2p : '',
           passMark2p:  ch ? ch.passMark2p : '',
+          sequence:    ch ? ch.sequence : null,
         });
       });
       console.log('🏕️ Areas loaded:', allAreas.length);

@@ -5,7 +5,8 @@
 
 import { states, gameState, toKey, getMyTeam, esc, teamName, teamSize,
          hasStarted, getCurrentAttempt, isAdminMode, formatCountdown, connectedKeys } from './shared.js';
-import { claimArea, failChallenge, startAttempt, startTimer, adminSetArea, adminClearAttempt } from './actions.js';
+import { claimArea, failChallenge, startAttempt, startTimer, advanceSequence,
+         adminSetArea, adminClearAttempt } from './actions.js';
 import { showModal, showConfirm, showPrompt } from './modal.js';
 import { setWakeLock } from './wakelock.js';
 import { getMap, getAreaLayers } from './map.js';
@@ -33,7 +34,7 @@ function buildSig(gs, key) {
   return JSON.stringify([
     a.owner, !!a.locked, a.attemptingBy || 0, (a.failedBy || []).join(','),
     a.result || '', a.era || 0, a.passMark || '', att ? att.startedAt : 0,
-    !!gs.winner, neighbours,
+    !!gs.winner, neighbours, att ? (att.letterIdx || 0) : 0,
   ]);
 }
 
@@ -238,12 +239,42 @@ export function openAreaPopup(area, latlng) {
           '<div id="attempt-timer" style="font-size:22px;font-weight:800;">—</div>' +
         '</div>';
     }
-    const verb = isUnclaimed ? '⛺ We Passed — Claim!' : '🏁 We\'re Done — Enter Our Result';
+    // Sequence challenges (Meadow's semaphore): the app feeds one item
+    // at a time and the running count is the score, so the team banks
+    // each success and chooses when to stop
+    const seqDone = attempt.letters ? (attempt.letterIdx || 0) : 0;
+    const seqAll  = attempt.letters ? attempt.letters.length : 0;
+    if (attempt.letters) {
+      const finished = seqDone >= seqAll;
+      // Deliberately no position, no total and no running score: losing
+      // count, and not knowing how many are left, is the whole point
+      body +=
+        '<div style="margin-top:10px;text-align:center;background:#111827;color:white;' +
+          'border-radius:10px;padding:10px;">' +
+          (finished
+            ? '<div style="font-size:15px;font-weight:800;">🎉 Maximum score reached!</div>'
+            : '<div style="font-size:10px;opacity:0.7;text-transform:uppercase;letter-spacing:0.05em;">' +
+                'Signal this letter</div>' +
+              '<div style="font-size:40px;font-weight:800;letter-spacing:0.05em;line-height:1.2;">' +
+                esc(attempt.letters[seqDone]) + '</div>') +
+        '</div>';
+    }
+
+    const verb = attempt.letters
+      ? '🏁 End and Lock Our Score'
+      : (isUnclaimed ? '⛺ We Passed — Claim!' : '🏁 We\'re Done — Enter Our Result');
     actionsHTML =
-      '<button id="claim-btn" class="btn btn-full" style="margin-top:10px;background:' +
-      states[myTeam].color + ';">' + verb + '</button>' +
+      (attempt.letters && seqDone < seqAll
+        ? '<button id="seq-next-btn" class="btn btn-full" style="margin-top:10px;background:' +
+          states[myTeam].color + ';">✅ Correct — Next Letter</button>'
+        : '') +
+      '<button id="claim-btn" class="btn btn-full" style="margin-top:' +
+      (attempt.letters ? '6' : '10') + 'px;background:' +
+      (attempt.letters ? '#111827' : states[myTeam].color) + ';">' + verb + '</button>' +
       '<button id="fail-btn" class="btn btn-neutral btn-full" style="margin-top:6px;">' +
-        (isUnclaimed ? '❌ We Failed' : '❌ We Failed / Gave Up') + '</button>';
+        (attempt.letters
+          ? '❌ Called Wrong — Fail'
+          : (isUnclaimed ? '❌ We Failed' : '❌ We Failed / Gave Up')) + '</button>';
   }
 
   const content = document.createElement('div');
@@ -293,9 +324,22 @@ export function openAreaPopup(area, latlng) {
     busy = true;
     try {
       const manual = !!(area.timer && area.timer.manualStart);
-      const res = await startAttempt(key, myTeam, expected, { manualStart: manual });
+      const res = await startAttempt(key, myTeam, expected,
+        { manualStart: manual, sequence: area.sequence || null });
       if (!res.ok) { showError(res.reason); return; }
       setWakeLock(true);
+    } finally {
+      busy = false;
+    }
+    reopen();
+  });
+
+  const seqNextBtn = content.querySelector('#seq-next-btn');
+  if (seqNextBtn) seqNextBtn.addEventListener('click', async () => {
+    busy = true;
+    try {
+      const res = await advanceSequence(key, myTeam);
+      if (!res.ok) { showError(res.reason); return; }
     } finally {
       busy = false;
     }
@@ -405,7 +449,10 @@ export function openAreaPopup(area, latlng) {
   if (claimBtn) claimBtn.addEventListener('click', async () => {
     // For count-up challenges the elapsed time IS the natural result
     let suggested = '';
-    if (area.timer && area.timer.mode === 'up' && attempt) {
+    if (attempt && attempt.letters) {
+      // A sequence challenge's score IS how many they banked
+      suggested = String(attempt.letterIdx || 0);
+    } else if (area.timer && area.timer.mode === 'up' && attempt) {
       suggested = formatCountdown(Date.now() - attempt.startedAt);
     }
 
