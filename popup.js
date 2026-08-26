@@ -86,10 +86,10 @@ export function openAreaPopup(area, latlng) {
   const passMark     = a.passMark || basePassMark;
 
   const statusText = a.locked
-    ? '🔒 Locked by ' + esc(teamName(gs, a.owner)) + ' — cannot be taken'
+    ? '🔒 Locked by ' + esc(teamName(gs, a.owner)) + ', cannot be taken'
     : isUnclaimed
       ? 'Unclaimed'
-      : 'Claimed by ' + esc(teamName(gs, a.owner)) + ' — can be stolen';
+      : 'Claimed by ' + esc(teamName(gs, a.owner)) + ', can be stolen';
 
   // Connected zones and their current status — visible to everyone,
   // not gated by "revealed", since it's board/scoring info, not a
@@ -144,7 +144,7 @@ export function openAreaPopup(area, latlng) {
       body +=
         '<div style="font-size:12px;color:#374151;margin-top:6px;">' +
           '<span style="font-weight:700;">🏅 Result to beat:</span> ' +
-          esc(a.result || '—') +
+          esc(a.result || 'None') +
           ' <span style="color:#9ca3af;">(' + esc(teamName(gs, a.owner)) + ')</span>' +
         '</div>';
     }
@@ -166,7 +166,7 @@ export function openAreaPopup(area, latlng) {
     const age    = attRec && attRec.startedAt ? ' (started ' + minutesAgo(attRec.startedAt) + ')' : '';
     body += '<div style="font-size:12px;color:#e63946;font-weight:700;margin-top:6px;">' +
       (a.owner !== 0 ? '⚔️ ' : '⏳ ') + esc(teamName(gs, a.attemptingBy)) +
-      (a.owner !== 0 ? ' is contesting this area — win or lose, it locks!' : ' is attempting this challenge!') +
+      (a.owner !== 0 ? ' is contesting this area. Win or lose, it locks!' : ' is attempting this challenge!') +
       esc(age) + '</div>';
   }
 
@@ -175,20 +175,20 @@ export function openAreaPopup(area, latlng) {
       'This area is locked in for the rest of the game.</div>';
   } else if (isMine) {
     body += '<div style="font-size:12px;color:#6b7280;margin-top:8px;">' +
-      'Your area — another team can steal it (and lock it) by beating your result. If their steal fails, it locks for you.</div>';
+      'Your area. Another team can steal it (and lock it) by beating your result. If their steal fails, it locks for you.</div>';
   } else if (myTeam === null) {
     if (!admin) {
       body += '<div style="font-size:12px;color:#9ca3af;margin-top:8px;">Join a team in Settings to play.</div>';
     }
   } else if (iFailed) {
     body += '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
-      '❌ Your team failed this challenge — this area is off-limits to you for the rest of the game.</div>';
+      '❌ Your team failed this challenge. This area is off-limits to you for the rest of the game.</div>';
   } else if (a.attemptingBy && a.attemptingBy !== myTeam) {
     body += isUnclaimed
       ? '<div style="font-size:12px;color:#f59e0b;font-weight:600;margin-top:8px;">' +
-        '⏳ Wait — you can start if they fail.</div>'
+        '⏳ Wait. You can start if they fail.</div>'
       : '<div style="font-size:12px;color:#e63946;font-weight:600;margin-top:8px;">' +
-        '🚫 Too late — ' + esc(teamName(gs, a.attemptingBy)) + ' got here first. Only one team can contest a claimed area.</div>';
+        '🚫 Too late. ' + esc(teamName(gs, a.attemptingBy)) + ' got here first. Only one team can contest a claimed area.</div>';
   } else if (!attempt) {
     // Not started yet — starting reveals the challenge and commits the
     // team to a pass or a fail. Any NORMAL timer begins immediately, no
@@ -199,12 +199,12 @@ export function openAreaPopup(area, latlng) {
       '<button id="start-btn" class="btn btn-full" style="margin-top:10px;background:' +
       states[myTeam].color + ';">▶️ Start Challenge Attempt</button>' +
       '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center;">' +
-        'Only press this when your team is <strong>at this area</strong> and ready — ' +
+        'Only press this when your team is <strong>at this area</strong> and ready. ' +
         (manual
           ? 'it reveals the challenge; you start the timer yourselves, when ready. '
           : 'it reveals the challenge and starts any timer. ') +
         '<strong>This can\'t be undone once you start.</strong>' +
-        (isUnclaimed ? '' : ' Stealing shuts the other team out — win or lose, this area locks.') +
+        (isUnclaimed ? '' : ' Stealing shuts the other team out. Win or lose, this area locks.') +
       '</div>';
   } else if (area.timer && area.timer.manualStart && !attempt.startedAt) {
     // Revealed, but the team hasn't started the (possibly hidden) timer
@@ -215,7 +215,7 @@ export function openAreaPopup(area, latlng) {
       '<button id="starttimer-btn" class="btn btn-full" style="margin-top:10px;background:' +
       states[myTeam].color + ';">▶️ Start the Timer</button>' +
       '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center;">' +
-        'Press this the moment you\'re ready to begin — not before.' +
+        'Press this the moment you\'re ready to begin, not before.' +
       '</div>' +
       '<button id="fail-btn" class="btn btn-neutral btn-full" style="margin-top:6px;">' +
         (isUnclaimed ? '❌ We Failed' : '❌ We Failed / Gave Up') + '</button>';
@@ -225,7 +225,7 @@ export function openAreaPopup(area, latlng) {
       body +=
         '<div style="margin-top:10px;text-align:center;background:#111827;color:white;' +
           'border-radius:10px;padding:8px;font-size:12px;">' +
-          '⏱️ Timer running — deliberately hidden, don\'t peek at any other clock!' +
+          '⏱️ Timer running, deliberately hidden. Don\'t peek at any other clock!' +
         '</div>';
     } else if (area.timer) {
       const timerLabel = area.timer.mode === 'down'
@@ -236,7 +236,7 @@ export function openAreaPopup(area, latlng) {
           'border-radius:10px;padding:8px;">' +
           '<div style="font-size:10px;opacity:0.7;text-transform:uppercase;letter-spacing:0.05em;">' +
             timerLabel + '</div>' +
-          '<div id="attempt-timer" style="font-size:22px;font-weight:800;">—</div>' +
+          '<div id="attempt-timer" style="font-size:22px;font-weight:800;">...</div>' +
         '</div>';
     }
     // Sequence challenges (Meadow's semaphore): the app feeds one item
@@ -262,18 +262,18 @@ export function openAreaPopup(area, latlng) {
 
     const verb = attempt.letters
       ? '🏁 End and Lock Our Score'
-      : (isUnclaimed ? '⛺ We Passed — Claim!' : '🏁 We\'re Done — Enter Our Result');
+      : (isUnclaimed ? '⛺ We Passed: Claim!' : '🏁 We\'re Done: Enter Our Result');
     actionsHTML =
       (attempt.letters && seqDone < seqAll
         ? '<button id="seq-next-btn" class="btn btn-full" style="margin-top:10px;background:' +
-          states[myTeam].color + ';">✅ Correct — Next Letter</button>'
+          states[myTeam].color + ';">✅ Correct: Next Letter</button>'
         : '') +
       '<button id="claim-btn" class="btn btn-full" style="margin-top:' +
       (attempt.letters ? '6' : '10') + 'px;background:' +
       (attempt.letters ? '#111827' : states[myTeam].color) + ';">' + verb + '</button>' +
       '<button id="fail-btn" class="btn btn-neutral btn-full" style="margin-top:6px;">' +
         (attempt.letters
-          ? '❌ Called Wrong — Fail'
+          ? '❌ Called Wrong: Fail'
           : (isUnclaimed ? '❌ We Failed' : '❌ We Failed / Gave Up')) + '</button>';
   }
 
@@ -412,7 +412,7 @@ export function openAreaPopup(area, latlng) {
   // followed by a separate prompt
   async function promptClaim(prefill) {
     const reminderHTML = isGuess
-      ? 'Lock in your team\'s guess — it becomes the score rivals must beat.'
+      ? 'Lock in your team\'s guess. It becomes the score rivals must beat.'
       : 'Only claim if your team genuinely reached the pass mark' +
         (passMark ? ' (<strong>' + esc(passMark) + '</strong>)' : '') + '!';
     let error = '';
@@ -428,7 +428,7 @@ export function openAreaPopup(area, latlng) {
           maxlength: 60,
         }],
         buttons: [
-          { id: 'claim', label: '⛺ We passed — Claim!', color: states[myTeam].color },
+          { id: 'claim', label: '⛺ We passed: Claim!', color: states[myTeam].color },
           { id: 'back',  label: 'Back', style: 'ghost' },
         ],
         dismissable: true,
@@ -473,7 +473,7 @@ export function openAreaPopup(area, latlng) {
       let prefill = suggested;
       while (true) {
         const result = await promptResult(
-          'Be honest — you\'ll find out what you were up against next…', prefill);
+          'Be honest. You\'ll find out what you were up against next…', prefill);
         if (result === null) return; // abort — the attempt stays in progress
 
         // Closest-wins guesses: the app compares both guesses to the
@@ -491,8 +491,8 @@ export function openAreaPopup(area, latlng) {
               'Your guess: <strong>' + esc(result) + '</strong>' +
               '<div style="text-align:center;font-size:16px;font-weight:800;margin:10px 0;">' +
                 (win
-                  ? '🎉 Your guess is closer — you steal the area!'
-                  : '🛡️ ' + esc(teamName(gs, a.owner)) + '\'s guess is closer (or equal) — it locks for them.') +
+                  ? '🎉 Your guess is closer. You steal the area!'
+                  : '🛡️ ' + esc(teamName(gs, a.owner)) + '\'s guess is closer (or equal). It locks for them.') +
               '</div>',
             buttons: [win
               ? { id: 'go', label: '😈 Steal &amp; lock!', color: states[myTeam].color }
@@ -513,12 +513,12 @@ export function openAreaPopup(area, latlng) {
           title: '🥁 The moment of truth',
           bodyHTML:
             'The score to beat, set by <strong>' + esc(teamName(gs, a.owner)) + '</strong>:' +
-            '<div style="text-align:center;font-size:18px;font-weight:800;margin:10px 0;">"' + esc(a.result || '—') + '"</div>' +
+            '<div style="text-align:center;font-size:18px;font-weight:800;margin:10px 0;">"' + esc(a.result || 'None') + '"</div>' +
             'Your result: <strong>"' + esc(result) + '"</strong>' +
-            '<div style="font-size:12px;color:#6b7280;margin-top:8px;">A tie is not a beat — you must do strictly better to steal.</div>',
+            '<div style="font-size:12px;color:#6b7280;margin-top:8px;">A tie is not a beat. You must do strictly better to steal.</div>',
           buttons: [
-            { id: 'beat',  label: '✅ We beat it — steal &amp; lock!', color: states[myTeam].color },
-            { id: 'short', label: '🛡️ We fell short — locks for ' + esc(teamName(gs, a.owner)), style: 'neutral' },
+            { id: 'beat',  label: '✅ We beat it: steal &amp; lock!', color: states[myTeam].color },
+            { id: 'short', label: '🛡️ We fell short: locks for ' + esc(teamName(gs, a.owner)), style: 'neutral' },
             { id: 'back',  label: '↩ Go back', style: 'ghost' },
           ],
           dismissable: false, // an accidental tap must not settle an area forever
@@ -546,7 +546,7 @@ export function openAreaPopup(area, latlng) {
         '❌ Record a FAILED attempt?',
         isUnclaimed
           ? 'Your team will <strong>never</strong> be able to attempt ' + esc(area.name) + ' again.'
-          : 'The steal has failed — ' + esc(area.name) + ' <strong>locks permanently</strong> for ' +
+          : 'The steal has failed. ' + esc(area.name) + ' <strong>locks permanently</strong> for ' +
             esc(teamName(gs, a.owner)) + '!',
         'Yes, we failed', 'Back', 'danger'
       );

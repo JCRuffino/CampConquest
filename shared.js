@@ -227,7 +227,7 @@ export function gameOverGuard(gs) {
     if (gs.winner) {
       showInfo('🏆 Game over', esc(teamName(gs, gs.winner.team)) + ' reached the winning score!');
     } else {
-      showInfo('⏱️ Game over', 'The countdown has ended — no more areas can be claimed or stolen.<br>Check the leaderboard for the final standings.');
+      showInfo('⏱️ Game over', 'The countdown has ended. No more areas can be claimed or stolen.<br>Check the leaderboard for the final standings.');
     }
   });
   return true;

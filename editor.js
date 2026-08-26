@@ -77,7 +77,7 @@ export function selectEditorZone(key) {
   editorKey = key;
 
   const hint = editorControl && editorControl.querySelector('#editor-hint');
-  if (hint) hint.textContent = '✏️ ' + layer.area.name + ' — drag corners; drag a small circle to add a corner';
+  if (hint) hint.textContent = '✏️ ' + layer.area.name + ': drag corners; drag a small circle to add a corner';
   const copyBtn = editorControl && editorControl.querySelector('#editor-copy');
   if (copyBtn) copyBtn.disabled = false;
 
@@ -178,12 +178,12 @@ function copyEditorSnippet() {
   if (!editorKey) return;
   const layer = getAreaLayers()[editorKey];
   sendToOutput(agentPrompt([layer]));
-  showInfo('✅ Copied', 'An update prompt for "<strong>' + esc(layer.area.name) + '</strong>" is on the clipboard (and in the box in Settings).<br><br>Paste it to your AI coding agent — it\'ll update tools/generate_areas.py and regenerate areas.js for you.');
+  showInfo('✅ Copied', 'An update prompt for "<strong>' + esc(layer.area.name) + '</strong>" is on the clipboard (and in the box in Settings).<br><br>Paste it to your AI coding agent. It\'ll update tools/generate_areas.py and regenerate areas.js for you.');
 }
 
 // Every zone's CURRENT shape (including local edits) in one go
 function copyAllZones() {
   const layers = Object.values(getAreaLayers());
   sendToOutput(agentPrompt(layers));
-  showInfo('✅ Copied', 'An update prompt for all <strong>' + layers.length + '</strong> zones is on the clipboard (and in the box in Settings).<br><br>Paste it to your AI coding agent — it\'ll update tools/generate_areas.py and regenerate areas.js for you.');
+  showInfo('✅ Copied', 'An update prompt for all <strong>' + layers.length + '</strong> zones is on the clipboard (and in the box in Settings).<br><br>Paste it to your AI coding agent. It\'ll update tools/generate_areas.py and regenerate areas.js for you.');
 }

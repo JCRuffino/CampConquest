@@ -49,7 +49,7 @@ function updateActivity(gs) {
 
   el.innerHTML = rows.length
     ? rows.join('')
-    : '<div style="font-size:12px;color:#9ca3af;font-style:italic;">Nothing happening right now — get out there!</div>';
+    : '<div style="font-size:12px;color:#9ca3af;font-style:italic;">Nothing happening right now. Get out there!</div>';
 }
 
 // Mini scoreboard on the map: each team's score (areas + bonuses)
@@ -140,7 +140,7 @@ function updateLeaderboard(gs) {
             '<span>' + esc(teamName(gs, t)) + '</span>' +
           '</div>' +
           '<div style="font-size:11px;color:#9ca3af;padding-left:24px;line-height:1.4;">' +
-            (owned.length ? owned.map(esc).join(', ') : '—') +
+            (owned.length ? owned.map(esc).join(', ') : 'None') +
           '</div>' +
         '</div>';
       detailEl.appendChild(row);

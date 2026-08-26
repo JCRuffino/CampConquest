@@ -95,7 +95,7 @@
           between groups, and start the timer when everyone's ready.
         </div>
         <div style="font-size:12px;color:#6b7280;margin-bottom:12px;">
-          <strong>Players per team: <span id="setup-size-label">—</span></strong> — this is only
+          <strong>Players per team: <span id="setup-size-label">Not set</span></strong>. This is only
           changed as part of a Full Reset, so it can't shift under a game in progress.
         </div>
         <div class="setup-team-block" data-team="1" style="margin-bottom:12px;">
@@ -143,7 +143,7 @@
 
       <div class="settings-card">
         <div class="settings-card-title">⏱️ Game Timer</div>
-        <div class="settings-card-desc">Set a countdown for the game. When it hits zero the game ends — no more claims or locks.</div>
+        <div class="settings-card-desc">Set a countdown for the game. When it hits zero the game ends. No more claims or locks.</div>
         <div id="timer-status" style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px;">No countdown set.</div>
         <div id="timer-start-row" style="display:flex;gap:8px;align-items:center;">
           <button id="timer-dec-btn" class="btn btn-ghost btn-sm">−15m</button>
@@ -178,7 +178,7 @@
 
       <div class="settings-card" id="broadcast-card" style="display:none;">
         <div class="settings-card-title">📣 Broadcast (Admin)</div>
-        <div class="settings-card-desc">Send a message to every player's screen — it pops up as a toast and stays in the History.</div>
+        <div class="settings-card-desc">Send a message to every player's screen. It pops up as a toast and stays in the History.</div>
         <div style="display:flex;gap:8px;">
           <input type="text" id="broadcast-input" maxlength="120" placeholder="e.g. Lunch at the Village Square in 10!"
             style="flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;outline:none;" />
@@ -190,8 +190,8 @@
         <div class="settings-card-title">✏️ Area Editor (Admin)</div>
         <div class="settings-card-desc">
           Adjust a zone's shape: start the editor, tap a zone on the map, then drag its
-          corner handles — drag one of the small dashed circles on an edge to add a new
-          corner there. Press Copy and paste the result to your AI coding agent — it
+          corner handles. Drag one of the small dashed circles on an edge to add a new
+          corner there. Press Copy and paste the result to your AI coding agent. It
           updates <strong>tools/generate_areas.py</strong> and regenerates
           <strong>areas.js</strong> for you (changes only apply to everyone once that's done).
         </div>
@@ -207,9 +207,9 @@
         <div class="settings-card-title">🔴 Reset (Admin)</div>
         <div class="settings-card-desc">
           <strong>Restart Game</strong> wipes the board and history but keeps the teams and
-          their connected phones — for redoing a game with the same players.
+          their connected phones, for redoing a game with the same players.
           <strong>Full Reset</strong> also wipes team names, rosters and disconnects every
-          phone — use it between groups so the system is ready for new players. It's also the
+          phone. Use it between groups so the system is ready for new players. It's also the
           only place you choose 2 or 3 players per team, for the group about to start.
         </div>
         <button id="restart-btn" class="btn btn-amber btn-full" style="margin-bottom:8px;">🔄 Restart Game (same teams)</button>
@@ -280,7 +280,7 @@
       </div>
 
       <button id="rules-done-btn" class="btn btn-primary btn-full" style="display:none;margin-top:14px;">
-        ✅ We've read the rules — join a team
+        ✅ We've read the rules, join a team
       </button>
     </div>
   </div>

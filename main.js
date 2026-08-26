@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     while (!getGameCode()) {
       const res = await showModal({
         title: '🏕️ Join the game',
-        bodyHTML: 'Enter the game code — ask whoever set up the game.',
+        bodyHTML: 'Enter the game code. Ask whoever set up the game.',
         fields: [{ id: 'code', label: 'Game code', placeholder: 'letters, numbers, dashes' }],
         buttons: [{ id: 'ok', label: 'Connect', style: 'primary' }],
       });
@@ -218,7 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
           team:      0,
           type:      'timer',
           big:       true,
-          message:   '🏁 GAME OVER — the countdown has ended!' + standings,
+          message:   '🏁 GAME OVER! The countdown has ended.' + standings,
         });
       }
     });

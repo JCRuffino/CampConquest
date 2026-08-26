@@ -83,7 +83,7 @@ export function initSettings(resetCallback) {
       // Transient: hold here (dismissable) until rosters exist, then
       // startOnboarding() below closes this and takes over.
       holdingNoteHandle = showInfo('🔄 New game starting',
-        'The admin is setting up the next game — you\'ll be asked to pick your team when they\'re ready.');
+        'The admin is setting up the next game. You\'ll be asked to pick your team when they\'re ready.');
       kickNote = false;
     }
   }
@@ -111,16 +111,16 @@ export function initSettings(resetCallback) {
     try {
       const gs  = gameState.data;
       const note = kickNote
-        ? '<strong>The admin released this phone from its team — pick again.</strong><br><br>'
+        ? '<strong>The admin released this phone from its team. Pick again.</strong><br><br>'
         : '';
       kickNote = false;
       const res = await showModal({
         title: '👥 Which team is this phone for?',
-        bodyHTML: note + 'Each team has one phone. Pick your set of players — teams already on a phone aren\'t shown.',
+        bodyHTML: note + 'Each team has one phone. Pick your set of players. Teams already on a phone aren\'t shown.',
         buttons: [
           ...avail.map(t => ({
             id:    't' + t,
-            label: esc(playerNames(gs, t).join(' & ')) + ' — ' + esc(teamName(gs, t)),
+            label: esc(playerNames(gs, t).join(' & ')) + ' (' + esc(teamName(gs, t)) + ')',
             color: states[t].color,
           })),
           { id: 'watch', label: 'Not playing / just watching', style: 'ghost' },
@@ -180,7 +180,7 @@ export function initSettings(resetCallback) {
       return;
     }
     await showInfo('📖 Read the rules first',
-      'Read through every section with your team and ask the admin any questions — ' +
+      'Read through every section with your team and ask the admin any questions, ' +
       'then press the button at the bottom of the rules to join your team.',
       'Open the rules');
     document.querySelector('.nav-btn[data-screen="rules"]').click();
@@ -192,11 +192,11 @@ export function initSettings(resetCallback) {
     if (getMyTeam()) { rulesDoneBtn.style.display = 'none'; return; }
     const ok = await showConfirm('✅ All read?',
       'Confirm your team has read the rules and asked any questions.',
-      'Yes — choose our team', 'Keep reading');
+      'Yes, choose our team', 'Keep reading');
     if (!ok) return;
     if (!availableTeams().length) {
       await showInfo('😬 No teams free',
-        'All teams are already on a phone — check with the admin.');
+        'All teams are already on a phone. Check with the admin.');
       return;
     }
     rulesDoneBtn.style.display = 'none';
@@ -211,12 +211,12 @@ export function initSettings(resetCallback) {
     if (rulesDoneBtn && myTeam) rulesDoneBtn.style.display = 'none';
     if (myTeam) {
       currentLabel.textContent = '✅ You are on ' + teamName(gs, myTeam) +
-        ' — ' + playerNames(gs, myTeam).join(' & ');
+        ': ' + playerNames(gs, myTeam).join(' & ');
       currentLabel.style.color = states[myTeam].color;
     } else {
       currentLabel.textContent = availableTeams().length
         ? 'No team assigned yet.'
-        : 'No team assigned — spectator/admin mode.';
+        : 'No team assigned: spectator/admin mode.';
       currentLabel.style.color = '#555';
     }
     if (pickBtn)  pickBtn.style.display  = (!myTeam && !isAdminMode() && availableTeams().length) ? 'block' : 'none';
@@ -286,7 +286,7 @@ export function initSettings(resetCallback) {
     // deliberately set to 2, so read the raw value here instead
     const gs      = gameState.data;
     const rawSize = gs ? gs.teamSize : null;
-    if (setupSizeLabel) setupSizeLabel.textContent = rawSize == null ? '—' : String(rawSize);
+    if (setupSizeLabel) setupSizeLabel.textContent = rawSize == null ? 'Not set' : String(rawSize);
     const size = rawSize == null ? 2 : rawSize; // keep the 3rd input hidden until a size is chosen
     [1, 2, 3].forEach(t => {
       const third = document.getElementById('setup-player-' + t + '-3');
@@ -324,7 +324,7 @@ export function initSettings(resetCallback) {
     if (size == null) {
       const res = await showModal({
         title: '👥 Players per team',
-        bodyHTML: 'This game has no team size yet — how many players per team?',
+        bodyHTML: 'This game has no team size yet. How many players per team?',
         buttons: [
           { id: 'size2',  label: '2 players per team', style: 'primary' },
           { id: 'size3',  label: '3 players per team', style: 'primary' },
@@ -356,7 +356,7 @@ export function initSettings(resetCallback) {
     });
     if (committed) clearSetupDirty();
     if (setupStatus) {
-      setupStatus.textContent = committed ? '✅ Saved' : '❌ Not saved — still connecting? Try again.';
+      setupStatus.textContent = committed ? '✅ Saved' : '❌ Not saved. Still connecting? Try again.';
       setupStatus.style.color = committed ? '#2a9d3f' : '#e63946';
       setupStatus.style.display = 'block';
       setTimeout(() => { setupStatus.style.display = 'none'; }, 4000);
@@ -399,7 +399,7 @@ export function initSettings(resetCallback) {
     const ended   = t && t.endsAt && Date.now() >= t.endsAt;
 
     if (running) {
-      timerStatus.textContent = '⏱️ Countdown running — ends at ' +
+      timerStatus.textContent = '⏱️ Countdown running, ends at ' +
         new Date(t.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       timerStartRow.style.display  = 'none';
       timerAdjustRow.style.display = isAdmin ? 'flex' : 'none';
@@ -431,7 +431,7 @@ export function initSettings(resetCallback) {
         team:      0,
         type:      'timer',
         big:       true,
-        message:   '⏱️ Countdown started — ' + lenText.trim() + ' on the clock',
+        message:   '⏱️ Countdown started: ' + lenText.trim() + ' on the clock',
       });
     });
   });
@@ -491,7 +491,7 @@ export function initSettings(resetCallback) {
   const codeInput = document.getElementById('game-code-input');
   const codeBtn   = document.getElementById('game-code-btn');
 
-  if (codeLabel) codeLabel.textContent = 'Current code: ' + (getGameCode() || '—');
+  if (codeLabel) codeLabel.textContent = 'Current code: ' + (getGameCode() || 'None');
 
   if (codeBtn) codeBtn.addEventListener('click', async () => {
     const code = normalizeGameCode(codeInput.value);
@@ -639,7 +639,7 @@ export function initSettings(resetCallback) {
     const res = await showModal({
       title: '⚠️ Full reset for a new group',
       bodyHTML:
-        'Everything is wiped: the board, the history, team names, rosters — ' +
+        'Everything is wiped: the board, the history, team names, rosters, ' +
         'and every phone is disconnected from its team.<br><br>' +
         'How many players per team for this new group?' +
         '<br><br><strong>This cannot be undone.</strong>',

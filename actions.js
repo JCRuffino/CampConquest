@@ -27,7 +27,7 @@ export async function claimArea(key, team, expected, result) {
       return;
     }
     if (a.owner !== expected.owner || !!a.locked !== !!expected.locked) {
-      failReason = 'This area just changed — reopen it to see the latest state.';
+      failReason = 'This area just changed. Reopen it to see the latest state.';
       return;
     }
     if (a.locked) {
@@ -39,7 +39,7 @@ export async function claimArea(key, team, expected, result) {
       return;
     }
     if ((a.failedBy || []).includes(team)) {
-      failReason = 'Your team failed this challenge — you can\'t attempt this area again.';
+      failReason = 'Your team failed this challenge. You can\'t attempt this area again.';
       return;
     }
     if (a.attemptingBy && a.attemptingBy !== team) {
@@ -62,7 +62,7 @@ export async function claimArea(key, team, expected, result) {
     return gs;
   });
 
-  if (!committed) return { ok: false, reason: failReason || 'Could not claim — please try again.' };
+  if (!committed) return { ok: false, reason: failReason || 'Could not claim. Please try again.' };
 
   const gs = gameState.data;
   const name = (gs.areas[key] && gs.areas[key].displayName) || key;
@@ -75,7 +75,7 @@ export async function claimArea(key, team, expected, result) {
       type: 'steal',
       big:  true,
       message: '😈 ' + teamName(gs, team) + ' stole ' + name + ' from ' + teamName(gs, prevOwner) +
-               ' — it is now locked! 🔒',
+               '. It is now locked! 🔒',
     });
   } else {
     pushLog({
@@ -96,7 +96,7 @@ export async function claimArea(key, team, expected, result) {
       type: 'timer',
       big:  true,
       message: '🏆 ' + teamName(gs, winInfo.team) + ' has reached ' + winInfo.score +
-               ' points — THEY WIN THE GAME!',
+               ' points. THEY WIN THE GAME!',
     });
     return { ok: true };
   }
@@ -136,7 +136,7 @@ export async function failChallenge(key, team, expected) {
       return;
     }
     if (a.owner !== expected.owner || !!a.locked !== !!expected.locked) {
-      failReason = 'This area just changed — reopen it to see the latest state.';
+      failReason = 'This area just changed. Reopen it to see the latest state.';
       return;
     }
     if (a.locked || a.owner === team) {
@@ -160,7 +160,7 @@ export async function failChallenge(key, team, expected) {
     return gs;
   });
 
-  if (!committed) return { ok: false, reason: failReason || 'Could not record — please try again.' };
+  if (!committed) return { ok: false, reason: failReason || 'Could not record. Please try again.' };
 
   const gs = gameState.data;
   const name = (gs.areas[key] && gs.areas[key].displayName) || key;
@@ -170,7 +170,7 @@ export async function failChallenge(key, team, expected) {
       team,
       type: 'attempt',
       big:  true,
-      message: '🛡️ ' + teamName(gs, team) + ' failed to steal ' + name + ' — it is now LOCKED for ' +
+      message: '🛡️ ' + teamName(gs, team) + ' failed to steal ' + name + '. It is now LOCKED for ' +
                teamName(gs, lockedForOwner) + '!',
     });
   } else {
@@ -179,7 +179,7 @@ export async function failChallenge(key, team, expected) {
       team,
       type: 'attempt',
       message: '❌ ' + teamName(gs, team) + ' failed the challenge at ' + name +
-               ' — they can\'t attempt this area again',
+               '. They can\'t attempt this area again',
     });
   }
   return { ok: true };
@@ -219,7 +219,7 @@ export async function startAttempt(key, team, expected, { manualStart = false, s
       return;
     }
     if (a.owner !== expected.owner || !!a.locked !== !!expected.locked) {
-      failReason = 'This area just changed — reopen it to see the latest state.';
+      failReason = 'This area just changed. Reopen it to see the latest state.';
       return;
     }
     if (a.locked) {
@@ -231,7 +231,7 @@ export async function startAttempt(key, team, expected, { manualStart = false, s
       return;
     }
     if ((a.failedBy || []).includes(team)) {
-      failReason = 'Your team failed this challenge — you can\'t attempt this area again.';
+      failReason = 'Your team failed this challenge. You can\'t attempt this area again.';
       return;
     }
     // Only one team can be attempting an area's challenge at a time —
@@ -239,8 +239,8 @@ export async function startAttempt(key, team, expected, { manualStart = false, s
     // silently turning their initial attempt into a steal
     if (a.attemptingBy && a.attemptingBy !== team) {
       failReason = a.owner !== 0
-        ? 'Too late — another team is already contesting this area.'
-        : 'Another team is attempting this challenge right now — wait for their result.';
+        ? 'Too late. Another team is already contesting this area.'
+        : 'Another team is attempting this challenge right now. Wait for their result.';
       return;
     }
     a.attemptingBy = team;
@@ -254,7 +254,7 @@ export async function startAttempt(key, team, expected, { manualStart = false, s
     return gs;
   });
 
-  if (!committed) return { ok: false, reason: failReason || 'Could not start — please try again.' };
+  if (!committed) return { ok: false, reason: failReason || 'Could not start. Please try again.' };
 
   const gs = gameState.data;
   const a  = gs.areas[key] || {};
@@ -267,7 +267,7 @@ export async function startAttempt(key, team, expected, { manualStart = false, s
     big:  isContest,
     message: isContest
       ? '⚔️ ' + teamName(gs, team) + ' is trying to STEAL ' + name + ' from ' +
-        teamName(gs, expected.owner) + ' — win or lose, it locks!'
+        teamName(gs, expected.owner) + '. Win or lose, it locks!'
       : '▶️ ' + teamName(gs, team) + ' started the challenge at ' + name,
   });
 
@@ -292,7 +292,7 @@ export async function startTimer(key, team) {
     const a = gs.areas && gs.areas[key];
     const att = gs.attempts && gs.attempts[team] && gs.attempts[team][key];
     if (!a || !att || (att.era || 0) !== (a.era || 0)) {
-      failReason = 'This attempt is no longer active — reopen the area.';
+      failReason = 'This attempt is no longer active. Reopen the area.';
       return;
     }
     if (att.startedAt) return gs; // already running — no-op
@@ -300,7 +300,7 @@ export async function startTimer(key, team) {
     return gs;
   });
 
-  if (!committed) return { ok: false, reason: failReason || 'Could not start the timer — please try again.' };
+  if (!committed) return { ok: false, reason: failReason || 'Could not start the timer. Please try again.' };
   return { ok: true };
 }
 
@@ -320,7 +320,7 @@ export async function advanceSequence(key, team) {
     const a   = gs.areas && gs.areas[key];
     const att = gs.attempts && gs.attempts[team] && gs.attempts[team][key];
     if (!a || !att || (att.era || 0) !== (a.era || 0)) {
-      failReason = 'This attempt is no longer active — reopen the area.';
+      failReason = 'This attempt is no longer active. Reopen the area.';
       return;
     }
     if (!att.letters) {
@@ -332,7 +332,7 @@ export async function advanceSequence(key, team) {
     return gs;
   });
 
-  if (!committed) return { ok: false, reason: failReason || 'Could not move on — please try again.' };
+  if (!committed) return { ok: false, reason: failReason || 'Could not move on. Please try again.' };
   return { ok: true };
 }
 
@@ -355,7 +355,7 @@ export async function claimTeam(team) {
     return gs;
   });
 
-  if (!committed) return { ok: false, reason: failReason || 'Could not join — please try again.' };
+  if (!committed) return { ok: false, reason: failReason || 'Could not join. Please try again.' };
 
   const gs = gameState.data;
   pushLog({
@@ -376,7 +376,7 @@ export async function releaseTeam(team) {
   // Nothing to do if the state hasn't loaded, or the team was never
   // claimed (or was already released) — the desired end state already
   // holds, so that's a success, not a failure with an empty reason
-  if (!gameState.data) return { ok: false, reason: 'Not connected — try again.' };
+  if (!gameState.data) return { ok: false, reason: 'Not connected. Try again.' };
   if (!gameState.data.teamClaims || !gameState.data.teamClaims[team]) return { ok: true };
 
   let failReason = '';
@@ -393,7 +393,7 @@ export async function releaseTeam(team) {
   });
 
   if (committed) return { ok: true };
-  return { ok: false, reason: failReason || 'Could not release — please try again.' };
+  return { ok: false, reason: failReason || 'Could not release. Please try again.' };
 }
 
 // Admin: free an abandoned attempt — the area reopens to everyone
@@ -411,7 +411,7 @@ export async function adminClearAttempt(key) {
     return gs;
   });
 
-  if (!committed) return { ok: false, reason: 'No attempt to clear — reopen the area.' };
+  if (!committed) return { ok: false, reason: 'No attempt to clear. Reopen the area.' };
 
   const gs = gameState.data;
   const name = (gs.areas[key] && gs.areas[key].displayName) || key;
@@ -420,7 +420,7 @@ export async function adminClearAttempt(key) {
     team: 0,
     type: 'attempt',
     message: '⚙️ Admin cleared ' + teamName(gs, clearedTeam) + '\'s stuck attempt at ' + name +
-             ' — the area is open again',
+             '. The area is open again',
   });
   return { ok: true };
 }
@@ -457,7 +457,7 @@ export async function adminSetArea(key, fields) {
     return gs;
   });
 
-  if (!committed) return { ok: false, reason: 'Could not update — please try again.' };
+  if (!committed) return { ok: false, reason: 'Could not update. Please try again.' };
 
   const gs = gameState.data;
   const name = (gs.areas[key] && gs.areas[key].displayName) || key;
@@ -476,7 +476,7 @@ export async function adminSetArea(key, fields) {
       big:  true,
       message: winnerChange.to
         ? '🏆 After the admin correction, ' + teamName(gs, winnerChange.to) + ' has the winning score and WINS!'
-        : '⚙️ Admin correction: the previous win no longer stands — the game is back on!',
+        : '⚙️ Admin correction: the previous win no longer stands. The game is back on!',
     });
   }
   return { ok: true };
