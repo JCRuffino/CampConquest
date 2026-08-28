@@ -28,21 +28,6 @@ export function setMyTeam(t) {
   else localStorage.setItem('myTeam', String(t));
 }
 
-// The gs.resetEpoch value in effect when this device last claimed a
-// team — compared later against the current epoch to tell "a full
-// reset happened since I joined" (treat this phone as a brand-new
-// player) apart from "my team was just released mid-game" (a same
-// -group phone swap, no need to re-read the rules). See resetEpoch().
-export function getMyTeamEpoch() {
-  const v = localStorage.getItem('myTeamEpoch');
-  return v ? parseInt(v) : 0;
-}
-
-export function setMyTeamEpoch(e) {
-  if (e == null) localStorage.removeItem('myTeamEpoch');
-  else localStorage.setItem('myTeamEpoch', String(e));
-}
-
 // ── GAME CODE ─────────────────────────────────────────────────────
 // The secret code that namespaces all data in Firebase
 // (camp/<code>/…). The security rules only allow access under the
@@ -91,12 +76,6 @@ export function playerNames(gs, team) {
   if (p.length) return p;
   const size = teamSize(gs);
   return size === 3 ? ['Player 1', 'Player 2', 'Player 3'] : ['Player 1', 'Player 2'];
-}
-
-// Bumped only by a FULL reset (never a restart, never a single team
-// release) — see main.js's reset callback and getMyTeamEpoch() above.
-export function resetEpoch(gs) {
-  return (gs && gs.resetEpoch) || 0;
 }
 
 // ── ADMIN MODE ────────────────────────────────────────────────────

@@ -1,7 +1,6 @@
 import { mutateState, pushLog, getUid } from './firebase.js';
 import { gameState, getMyTeam, setMyTeam, states, teamName, esc,
          getGameCode, setGameCode, normalizeGameCode, playerNames, teamSize,
-         resetEpoch, getMyTeamEpoch, setMyTeamEpoch,
          isAdminMode, setAdminMode } from './shared.js';
 import { claimTeam, releaseTeam } from './actions.js';
 import { toggleAreaEditor } from './map.js';
@@ -10,11 +9,12 @@ import { showModal, showConfirm, showInfo } from './modal.js';
 export function initSettings(resetCallback) {
 
   // ── Your team ─────────────────────────────────────────────────────
-  // The admin enters the rosters (Game Setup below); each player phone
-  // claims one team from those still free. Being on a team means
-  // holding its claim (gameState.teamClaims[team] === this device's
-  // auth uid) — if the claim goes (admin release, reset), the phone
-  // drops off the team and is offered the pick again.
+  // Every phone that connects is asked who it is: a player, or the
+  // admin. Players then pick their team from those still free, and are
+  // offered the rules with the option to skip. Being on a team means
+  // holding that team's claim (gameState.teamClaims[team] === this
+  // device's auth uid); if the claim goes (admin release, reset) the
+  // phone drops off and the entry flow offers it again.
   const currentLabel = document.getElementById('current-team-label');
   const pickBtn      = document.getElementById('team-pick-btn');
   const leaveBtn     = document.getElementById('team-leave-btn');
@@ -27,7 +27,7 @@ export function initSettings(resetCallback) {
     // claim-validity check below never gets silently skipped
     syncTeamFromClaims();
     refreshTeamUI();
-    maybeOnboard();
+    maybeRunEntryFlow();
   });
 
   function availableTeams() {
@@ -40,201 +40,162 @@ export function initSettings(resetCallback) {
     });
   }
 
-  let pickerOpen     = false;
-  let pickerDeclined = false; // "just watching" — don't re-prompt this session
-  let kickNote       = false; // lightweight re-pick (no rules) vs full onboarding
-  // Handle of the "new game starting" holding note (see below) — kept
-  // so startOnboarding() can dismiss it once real rosters arrive,
-  // instead of stacking a second modal on top of it
-  let holdingNoteHandle = null;
-
-  function anyRosterExists() {
-    const gs = gameState.data;
-    if (!gs) return false;
-    return [1, 2, 3].some(t => ((gs.players && gs.players[t]) || []).filter(n => n).length > 0);
+  function hasValidClaim() {
+    const gs     = gameState.data;
+    const myTeam = getMyTeam();
+    if (!gs || !myTeam || !myUid) return false;
+    return (gs.teamClaims || {})[myTeam] === myUid;
   }
 
-  // Being on a team requires holding its claim — if it's gone (admin
-  // release, a full reset, or another phone somehow took it), drop off.
-  // A FULL reset bumps gs.resetEpoch; if that's moved on since this
-  // phone last claimed a team, treat it as a brand-new player (full
-  // onboarding, rules and all) — otherwise it's a same-game phone
-  // swap (e.g. a dead phone), so skip straight to a lightweight re-pick.
+  // A modal chain is already running; never stack a second one on it
+  let flowOpen = false;
+  // They dismissed the entry flow, or said they're the admin, so stop
+  // auto-asking this session. The Settings button always re-opens it,
+  // so this can never become a dead end.
+  let entryDeclined = false;
+
+  // Being on a team requires holding its claim. If it's gone (admin
+  // release, a reset, or another phone took it) drop off and let the
+  // entry flow offer a fresh pick, which it does as soon as there is a
+  // free team to pick.
   function syncTeamFromClaims() {
     const gs     = gameState.data;
     const myTeam = getMyTeam();
     if (!gs || !myTeam || !myUid) return;
-    const claims = gs.teamClaims || {};
-    if (claims[myTeam] === myUid) return; // still valid, nothing to do
-
-    const wasFullReset = resetEpoch(gs) > getMyTeamEpoch();
+    if ((gs.teamClaims || {})[myTeam] === myUid) return; // still valid
     setMyTeam(null);
-    pickerDeclined = false;
-    if (isAdminMode() || availableTeams().length) {
-      kickNote = !wasFullReset;
-    } else if (anyRosterExists()) {
-      // At least one team is set up, just all claimed — a real dead end
+    entryDeclined = false;
+    if (!availableTeams().length) {
       showInfo('👋 Thanks for playing',
-        'Thanks for playing, you have now been disconnected from the game, please close this window.');
-      kickNote = false;
-    } else {
-      // No team has a roster at all — this is the moment right after a
-      // Full Reset, before the admin has saved the next group's setup.
-      // Transient: hold here (dismissable) until rosters exist, then
-      // startOnboarding() below closes this and takes over.
-      holdingNoteHandle = showInfo('🔄 New game starting',
-        'The admin is setting up the next game. You\'ll be asked to pick your team when they\'re ready.');
-      kickNote = false;
+        'This phone has been disconnected from the game. If another game is being set up, ' +
+        'you will be asked to pick a team as soon as it is ready.');
     }
   }
 
-  // A phone with no team is onboarded (playing? → rules → picker); a
-  // phone released mid-game without an intervening full reset re-picks
-  // without the rules. Called after every gameState update AND once
-  // this device's auth uid resolves, so neither trigger can race past
-  // the other and leave a stale claim undetected (see getUid() above).
-  function maybeOnboard() {
-    const gs = gameState.data;
-    if (gs && !getMyTeam() && !isAdminMode() && !pickerDeclined) {
-      if (kickNote) offerTeamPick(true);
-      else startOnboarding();
-    }
+  // Called after every gameState update and once the auth uid resolves,
+  // so neither can race past the other. Only auto-runs when a team is
+  // actually free, so a phone waiting on the admin isn't nagged with a
+  // dialog it can't act on; it runs the moment one becomes available.
+  function maybeRunEntryFlow() {
+    if (flowOpen || entryDeclined) return;
+    if (!gameState.data || isAdminMode() || hasValidClaim()) return;
+    if (!availableTeams().length) return;
+    runEntryFlow(true);
   }
 
-  async function offerTeamPick(auto) {
-    if (pickerOpen) return;
-    if (isAdminMode()) return; // the admin teaches, they don't play
-    if (getMyTeam()) return;   // already on a team
-    const avail = availableTeams();
-    if (!avail.length) return;
-    pickerOpen = true;
+  async function runEntryFlow(auto) {
+    if (flowOpen) return;
+    if (isAdminMode() || hasValidClaim()) return;
+    flowOpen = true;
     try {
-      const gs  = gameState.data;
-      const note = kickNote
-        ? '<strong>The admin released this phone from its team. Pick again.</strong><br><br>'
-        : '';
-      kickNote = false;
+      const role = await showModal({
+        title: '🏕️ Welcome to Camp Conquest',
+        bodyHTML: 'Who is using this phone?',
+        buttons: [
+          { id: 'player', label: '🎮 A team playing the game', style: 'primary' },
+          { id: 'admin',  label: '🛠️ The admin running it',    style: 'amber' },
+        ],
+        dismissable: true,
+      });
+      if (!role) { if (auto) entryDeclined = true; return; }
+      if (role.button === 'admin') {
+        entryDeclined = true; // don't nag; Settings can re-open this
+        await showInfo('🛠️ Admin',
+          'Enter the admin password in Settings to unlock the admin controls.',
+          'Take me to Settings');
+        document.querySelector('.nav-btn[data-screen="settings"]').click();
+        return;
+      }
+      await pickTeamThenRules(auto);
+    } finally {
+      flowOpen = false;
+    }
+  }
+
+  // Pick a team, then offer the rules. Callers own the flowOpen guard.
+  async function pickTeamThenRules(auto) {
+    while (true) {
+      const gs    = gameState.data;
+      const avail = availableTeams();
+      if (!avail.length) {
+        await showInfo('⏳ No teams free',
+          'Either every team is already on a phone, or the admin has not set the teams up yet. ' +
+          'Check with the admin, then try again.');
+        return false;
+      }
       const res = await showModal({
         title: '👥 Which team is this phone for?',
-        bodyHTML: note + 'Each team has one phone. Pick your set of players. Teams already on a phone aren\'t shown.',
+        bodyHTML: 'Each team has one phone. Pick your set of players; teams already on a phone are not shown.',
         buttons: [
           ...avail.map(t => ({
             id:    't' + t,
             label: esc(playerNames(gs, t).join(' & ')) + ' (' + esc(teamName(gs, t)) + ')',
             color: states[t].color,
           })),
-          { id: 'watch', label: 'Not playing / just watching', style: 'ghost' },
+          { id: 'none', label: 'Not playing / just watching', style: 'ghost' },
         ],
         dismissable: true,
       });
-      if (!res || res.button === 'watch') {
-        if (auto) pickerDeclined = true;
-        return;
-      }
+      if (!res || res.button === 'none') { if (auto) entryDeclined = true; return false; }
       const t = parseInt(res.button.slice(1));
       const r = await claimTeam(t);
       if (!r.ok) {
         await showInfo('😬 Too slow', esc(r.reason || 'That team was just taken.'));
-        pickerOpen = false;
-        return offerTeamPick(auto); // re-offer with the updated list
+        continue; // re-offer with the updated list
       }
       setMyTeam(t);
-      setMyTeamEpoch(resetEpoch(gameState.data)); // mark: valid as of this reset epoch
       rerender();
-    } finally {
-      pickerOpen = false;
+      await offerRules();
+      return true;
     }
   }
 
-  // ── Onboarding ────────────────────────────────────────────────────
-  // A fresh phone is asked whether it's playing, then sent to the
-  // Rules screen; the button at the bottom of the rules confirms
-  // they've been read and opens the team picker. Phones released
-  // mid-game (kickNote) skip the rules and go straight to the picker.
-  const rulesDoneBtn = document.getElementById('rules-done-btn');
-  let onboardingActive = false; // asked / reading the rules
-
-  async function startOnboarding() {
-    if (onboardingActive || pickerOpen) return;
-    if (isAdminMode() || getMyTeam()) return;
-    if (!availableTeams().length) return;
-    // Rosters have arrived — the holding note (if any) is stale now;
-    // dismiss it so it doesn't sit stacked under this modal
-    if (holdingNoteHandle) {
-      holdingNoteHandle.close();
-      holdingNoteHandle = null;
-    }
-    onboardingActive = true;
+  // Optional by design: a returning group who already know the game can
+  // skip straight to the map, and the Rules tab is always there anyway
+  async function offerRules() {
     const res = await showModal({
-      title: '🏕️ Playing in the next game?',
-      bodyHTML: 'Is this phone for a team in the next game?',
+      title: '📖 Read the rules?',
+      bodyHTML: 'Worth reading through with your team before you start. ' +
+                'They are always on the Rules tab if you want them later.',
       buttons: [
-        { id: 'play',  label: '🎮 Yes, we\'re playing', style: 'primary' },
-        { id: 'watch', label: '👀 Just watching',       style: 'ghost' },
+        { id: 'read', label: '📖 Read the rules', style: 'primary' },
+        { id: 'skip', label: 'Skip, we know how to play', style: 'ghost' },
       ],
       dismissable: true,
     });
-    if (!res || res.button !== 'play') {
-      pickerDeclined   = true;
-      onboardingActive = false;
-      return;
-    }
-    await showInfo('📖 Read the rules first',
-      'Read through every section with your team and ask the admin any questions, ' +
-      'then press the button at the bottom of the rules to join your team.',
-      'Open the rules');
-    document.querySelector('.nav-btn[data-screen="rules"]').click();
-    if (rulesDoneBtn) rulesDoneBtn.style.display = 'block';
-    // onboardingActive stays true until the rules are confirmed
+    const screen = (res && res.button === 'read') ? 'rules' : 'map';
+    document.querySelector('.nav-btn[data-screen="' + screen + '"]').click();
   }
-
-  if (rulesDoneBtn) rulesDoneBtn.addEventListener('click', async () => {
-    if (getMyTeam()) { rulesDoneBtn.style.display = 'none'; return; }
-    const ok = await showConfirm('✅ All read?',
-      'Confirm your team has read the rules and asked any questions.',
-      'Yes, choose our team', 'Keep reading');
-    if (!ok) return;
-    if (!availableTeams().length) {
-      await showInfo('😬 No teams free',
-        'All teams are already on a phone. Check with the admin.');
-      return;
-    }
-    rulesDoneBtn.style.display = 'none';
-    onboardingActive = false;
-    await offerTeamPick(false);
-    if (getMyTeam()) document.querySelector('.nav-btn[data-screen="map"]').click();
-  });
 
   function refreshTeamUI() {
     const myTeam = getMyTeam();
     const gs     = gameState.data;
-    if (rulesDoneBtn && myTeam) rulesDoneBtn.style.display = 'none';
     if (myTeam) {
       currentLabel.textContent = '✅ You are on ' + teamName(gs, myTeam) +
         ': ' + playerNames(gs, myTeam).join(' & ');
       currentLabel.style.color = states[myTeam].color;
     } else {
-      currentLabel.textContent = availableTeams().length
-        ? 'No team assigned yet.'
-        : 'No team assigned: spectator/admin mode.';
+      currentLabel.textContent = isAdminMode()
+        ? 'No team assigned: admin mode.'
+        : 'No team assigned yet.';
       currentLabel.style.color = '#555';
     }
-    if (pickBtn)  pickBtn.style.display  = (!myTeam && !isAdminMode() && availableTeams().length) ? 'block' : 'none';
+    // Shown whenever this phone isn't on a team, even if no team is
+    // currently free: the flow explains why rather than dead-ending
+    if (pickBtn)  pickBtn.style.display  = (!myTeam && !isAdminMode()) ? 'block' : 'none';
     if (leaveBtn) leaveBtn.style.display = myTeam ? 'inline-flex' : 'none';
     refreshAdminUI();
   }
 
-  if (pickBtn) pickBtn.addEventListener('click', () => {
-    // If onboarding is already mid-flight (rules screen open, waiting on
-    // the confirm button), startOnboarding() below would just no-op —
-    // send them back to confirm the rules instead of doing nothing
-    if (onboardingActive) {
-      document.querySelector('.nav-btn[data-screen="rules"]').click();
-      if (rulesDoneBtn) rulesDoneBtn.style.display = 'block';
-      return;
+  if (pickBtn) pickBtn.addEventListener('click', async () => {
+    if (flowOpen) return;
+    entryDeclined = false;
+    flowOpen = true;
+    try {
+      await pickTeamThenRules(false);
+    } finally {
+      flowOpen = false;
     }
-    pickerDeclined = false;
-    startOnboarding(); // playing? → rules → picker
   });
 
   if (leaveBtn) leaveBtn.addEventListener('click', async () => {
@@ -249,7 +210,7 @@ export function initSettings(resetCallback) {
       return; // the remote claim never changed — stay on the team locally too
     }
     setMyTeam(null);
-    pickerDeclined = false;
+    entryDeclined = false;
     rerender();
   });
 
@@ -675,7 +636,7 @@ export function initSettings(resetCallback) {
     });
 
     refreshTeamUI();
-    maybeOnboard();
+    maybeRunEntryFlow();
   }
 
   refreshTeamUI();
